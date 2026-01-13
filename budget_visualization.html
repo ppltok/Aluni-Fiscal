@@ -1548,8 +1548,8 @@
                 });
 
                 // Text for level 1 - adaptive based on box size (percentage)
-                // Use ₪ symbol for salary indicator (positioned at start of text for visibility)
-                const salaryIndicator = hasSalary && salaryPct >= 5 ? `<br><span style="font-size:1.2em;color:#fbbf24">₪ ${salaryPct.toFixed(0)}%</span>` : '';
+                // Salary indicator as a badge showing percentage of budget that goes to salaries
+                const salaryIndicator = hasSalary && salaryPct >= 5 ? `<br><span style="font-size:0.85em;background:#fbbf24;color:#1a1a1a;padding:2px 6px;border-radius:4px;font-weight:600">שכר ${salaryPct.toFixed(0)}%</span>` : '';
 
                 if (pct >= 15) {
                     // Very large boxes - extra large text with full info
