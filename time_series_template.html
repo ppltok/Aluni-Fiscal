@@ -298,37 +298,86 @@
 
         .years-filter {
             display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 280px;
         }
 
-        .year-chip {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 6px 10px;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-            user-select: none;
+        .year-range-container {
+            position: relative;
+            height: 40px;
+            display: flex;
+            align-items: center;
         }
 
-        .year-chip:hover {
-            border-color: var(--accent-blue);
-        }
-
-        .year-chip.active {
-            background: var(--accent-blue);
-            border-color: var(--accent-blue);
-            color: #ffffff;
-        }
-
-        .year-chip.excluded {
+        .year-range-track {
+            position: absolute;
+            width: 100%;
+            height: 6px;
             background: var(--bg-primary);
-            border-color: var(--border-color);
+            border-radius: 3px;
+        }
+
+        .year-range-selected {
+            position: absolute;
+            height: 6px;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 3px;
+        }
+
+        .year-range-input {
+            position: absolute;
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: transparent;
+            pointer-events: none;
+        }
+
+        .year-range-input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            cursor: pointer;
+            pointer-events: all;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+        }
+
+        .year-range-input::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        .year-range-input::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            cursor: pointer;
+            pointer-events: all;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            border: none;
+        }
+
+        .year-range-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
             color: var(--text-secondary);
-            text-decoration: line-through;
-            opacity: 0.6;
+        }
+
+        .year-range-display {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .year-range-display span {
+            color: var(--accent-blue);
         }
 
         /* Main Content */
@@ -747,8 +796,21 @@
                 </select>
             </div>
             <div class="control-group">
-                <span class="control-label">שנים להצגה</span>
-                <div class="years-filter" id="yearsFilter"></div>
+                <span class="control-label">טווח שנים</span>
+                <div class="years-filter" id="yearsFilter">
+                    <div class="year-range-display">
+                        <span id="startYearDisplay">2015</span>
+                        <span>-</span>
+                        <span id="endYearDisplay">2024</span>
+                    </div>
+                    <div class="year-range-container">
+                        <div class="year-range-track"></div>
+                        <div class="year-range-selected" id="yearRangeSelected"></div>
+                        <input type="range" class="year-range-input" id="startYearSlider">
+                        <input type="range" class="year-range-input" id="endYearSlider">
+                    </div>
+                    <div class="year-range-labels" id="yearRangeLabels"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -813,12 +875,13 @@
             allItems: [],
             filterValue: '',
             theme: localStorage.getItem('theme') || 'dark',
-            excludedYears: new Set()  // Years to exclude from display
+            startYear: allYears[0],
+            endYear: allYears[allYears.length - 1]
         };
 
-        // Computed years (excluding excluded ones)
+        // Get years within selected range
         function getActiveYears() {
-            return allYears.filter(y => !state.excludedYears.has(y));
+            return allYears.filter(y => y >= state.startYear && y <= state.endYear);
         }
         const years = allYears; // Keep for backward compatibility
         const levelNames = ['שם רמה 1', 'שם רמה 2', 'שם סעיף', 'שם תחום', 'שם תקנה', 'שם מיון רמה 1'];
@@ -883,46 +946,78 @@
         }
 
         // ============================================
-        // YEARS FILTER
+        // YEARS RANGE FILTER
         // ============================================
         function initYearsFilter() {
-            const container = document.getElementById('yearsFilter');
-            container.innerHTML = allYears.map(year =>
-                `<span class="year-chip active" data-year="${year}" onclick="toggleYear(${year})">${year}</span>`
-            ).join('');
+            const minYear = allYears[0];
+            const maxYear = allYears[allYears.length - 1];
+
+            const startSlider = document.getElementById('startYearSlider');
+            const endSlider = document.getElementById('endYearSlider');
+            const labelsContainer = document.getElementById('yearRangeLabels');
+
+            // Set slider attributes
+            startSlider.min = minYear;
+            startSlider.max = maxYear;
+            startSlider.value = minYear;
+
+            endSlider.min = minYear;
+            endSlider.max = maxYear;
+            endSlider.value = maxYear;
+
+            // Create year labels
+            labelsContainer.innerHTML = allYears.map(y => `<span>${y}</span>`).join('');
+
+            // Event listeners
+            startSlider.addEventListener('input', onStartYearChange);
+            endSlider.addEventListener('input', onEndYearChange);
+
+            // Initial update
+            updateYearRangeUI();
         }
 
-        function toggleYear(year) {
-            if (state.excludedYears.has(year)) {
-                state.excludedYears.delete(year);
-            } else {
-                // Don't allow excluding all years - keep at least 2
-                if (getActiveYears().length <= 2) {
-                    return;
-                }
-                state.excludedYears.add(year);
+        function onStartYearChange(e) {
+            let newStart = parseInt(e.target.value);
+            // Ensure start doesn't exceed end
+            if (newStart >= state.endYear) {
+                newStart = state.endYear - 1;
+                e.target.value = newStart;
             }
-            updateYearsFilterUI();
+            state.startYear = newStart;
+            updateYearRangeUI();
             updateChart();
             updateTable();
         }
 
-        function updateYearsFilterUI() {
-            const chips = document.querySelectorAll('.year-chip');
-            chips.forEach(chip => {
-                const year = parseInt(chip.dataset.year);
-                if (state.excludedYears.has(year)) {
-                    chip.classList.remove('active');
-                    chip.classList.add('excluded');
-                } else {
-                    chip.classList.add('active');
-                    chip.classList.remove('excluded');
-                }
-            });
+        function onEndYearChange(e) {
+            let newEnd = parseInt(e.target.value);
+            // Ensure end doesn't go below start
+            if (newEnd <= state.startYear) {
+                newEnd = state.startYear + 1;
+                e.target.value = newEnd;
+            }
+            state.endYear = newEnd;
+            updateYearRangeUI();
+            updateChart();
+            updateTable();
         }
 
-        // Make toggleYear global
-        window.toggleYear = toggleYear;
+        function updateYearRangeUI() {
+            const minYear = allYears[0];
+            const maxYear = allYears[allYears.length - 1];
+            const range = maxYear - minYear;
+
+            // Update display
+            document.getElementById('startYearDisplay').textContent = state.startYear;
+            document.getElementById('endYearDisplay').textContent = state.endYear;
+
+            // Update selected range highlight
+            const startPct = ((state.startYear - minYear) / range) * 100;
+            const endPct = ((state.endYear - minYear) / range) * 100;
+            const selectedBar = document.getElementById('yearRangeSelected');
+            selectedBar.style.left = startPct + '%';
+            selectedBar.style.width = (endPct - startPct) + '%';
+        }
 
         // ============================================
         // DATA FUNCTIONS
