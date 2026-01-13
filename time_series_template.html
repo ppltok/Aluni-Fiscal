@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>השוואה שנתית | תקציב המדינה</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <style>
+        :root {
+            /* Dark Mode (default) */
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --bg-tertiary: #f0f2f5;
+            --border-color: #d0d7de;
+            --text-primary: #1f2328;
+            --text-secondary: #656d76;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 40px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-blue));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .logo-text {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .logo-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .theme-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--accent-blue);
+        }
+
+        /* Sidebar Toggle - fixed top-right */
+        .sidebar-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 150;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 18px;
+            line-height: 1;
+            transition: all 0.2s;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 200;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .sidebar-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .sidebar-close:hover {
+            color: var(--text-primary);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+        }
+
+        .sidebar-nav-item {
+            margin-bottom: 8px;
+        }
+
+        .sidebar-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .sidebar-nav-link:hover {
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .sidebar-nav-link.active {
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.15);
+        }
+
+        .sidebar-nav-icon {
+            font-size: 20px;
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 190;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .sidebar-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* Controls */
+        .controls {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 40px;
+        }
+
+        .controls-inner {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .control-select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text-primary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            min-width: 180px;
+            cursor: pointer;
+        }
+
+        .control-select:hover, .control-select:focus {
+            border-color: var(--accent-blue);
+            outline: none;
+        }
+
+        .control-select option {
+            background: var(--bg-secondary);
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 30px 40px;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .chart-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .chart-plot {
+            height: 550px;
+        }
+
+        /* Items Grid */
+        .items-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+        }
+
+        .item-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .item-checkbox:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .item-checkbox.selected {
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .item-checkbox input {
+            accent-color: var(--accent-blue);
+            width: 18px;
+            height: 18px;
+        }
+
+        .item-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .item-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .item-label {
+            font-size: 15px;
+            font-weight: 500;
+            word-break: break-word;
+        }
+
+        .item-path {
+            font-size: 12px;
+            color: var(--text-secondary);
+            word-break: break-word;
+            margin-top: 3px;
+        }
+
+        .item-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        /* Selection controls */
+        .selection-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: var(--text-primary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4090e0;
+        }
+
+        /* Data Table */
+        .data-table-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 30px;
+        }
+
+        .data-table-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th, .data-table td {
+            padding: 12px 16px;
+            text-align: right;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background: var(--bg-tertiary);
+            font-weight: 500;
+            font-size: 13px;
+            color: var(--text-secondary);
+            position: sticky;
+            top: 0;
+        }
+
+        .data-table td {
+            font-size: 14px;
+        }
+
+        .data-table tr:hover td {
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        .change-positive { color: var(--accent-green); }
+        .change-negative { color: var(--accent-red); }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Loader */
+        .loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+
+        .loader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loader-text {
+            margin-top: 20px;
+            color: var(--text-secondary);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive - Tablet */
+        @media (max-width: 1024px) {
+            .header-content { flex-direction: column; gap: 15px; }
+            .controls-row { flex-direction: column; gap: 15px; }
+            .items-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* Responsive - Mobile */
+        @media (max-width: 768px) {
+            .header { padding: 15px 20px; }
+            .controls { padding: 15px 20px; }
+            .main-content { padding: 15px; }
+            .chart-plot { height: 350px; }
+            .items-grid { grid-template-columns: 1fr; }
+            .sidebar { width: 100%; }
+
+            .logo-text { font-size: 20px; }
+            .logo-subtitle { font-size: 11px; }
+
+            .sidebar-toggle {
+                top: 15px;
+                right: 15px;
+            }
+
+            .item-checkbox {
+                padding: 10px 14px;
+            }
+
+            .item-label {
+                font-size: 14px;
+            }
+
+            .item-path {
+                font-size: 11px;
+            }
+
+            .data-table {
+                font-size: 12px;
+            }
+
+            .data-table th, .data-table td {
+                padding: 8px 10px;
+            }
+
+            .btn {
+                padding: 10px 14px;
+                font-size: 14px;
+            }
+        }
+
+        /* Responsive - Small phones */
+        @media (max-width: 480px) {
+            .header { padding: 12px 15px; }
+            .main-content { padding: 10px; }
+            .chart-plot { height: 300px; }
+
+            .item-checkbox {
+                padding: 8px 12px;
+                gap: 8px;
+            }
+
+            .item-label {
+                font-size: 13px;
+            }
+
+            .selection-controls {
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                flex: 1;
+                min-width: 80px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loader -->
+    <div class="loader" id="loader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">טוען נתוני תקציב...</div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">ויזואליזציות</span>
+            <button class="sidebar-close" id="sidebarClose">&times;</button>
+        </div>
+        <div class="sidebar-content">
+            <ul class="sidebar-nav">
+                <li class="sidebar-nav-item">
+                    <a href="budget_interactive.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#9632;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">תקציב אינטראקטיבי</div>
+                            <div class="sidebar-nav-desc">Treemap עם ניתוח לפי רמות</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="time_series.html" class="sidebar-nav-link active">
+                        <span class="sidebar-nav-icon">&#8593;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">השוואה שנתית</div>
+                            <div class="sidebar-nav-desc">מגמות לאורך זמן</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="salary_percentage.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#8362;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">אחוזי שכר</div>
+                            <div class="sidebar-nav-desc">גמישות תקציבית לפי משרד</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="ministry_overview.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#9962;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">סקירת משרדים</div>
+                            <div class="sidebar-nav-desc">השוואה בין משרדים</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="sunburst_budget.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#9788;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">Sunburst</div>
+                            <div class="sidebar-nav-desc">תרשים שמש היררכי</div>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </aside>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">&#8593;</div>
+                <div>
+                    <div class="logo-text">השוואה שנתית</div>
+                    <div class="logo-subtitle">מגמות תקציב לאורך זמן | 2015-2024</div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="theme-toggle" id="themeToggle" title="החלף מצב תצוגה">&#9790;</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar Toggle Button - Fixed Top Right -->
+    <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+
+    <!-- Controls -->
+    <div class="controls">
+        <div class="controls-inner">
+            <div class="control-group">
+                <span class="control-label">רמת פירוט</span>
+                <select class="control-select" id="levelSelect">
+                    <option value="0">רמה 1 - תחום</option>
+                    <option value="1">רמה 2 - תת-תחום</option>
+                    <option value="2">רמה 3 - משרד</option>
+                    <option value="3">רמה 4 - תחום פעילות</option>
+                    <option value="4">רמה 5 - תקנה</option>
+                    <option value="5">רמה 6 - סוג הוצאה</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <span class="control-label">סינון לפי תחום (אופציונלי)</span>
+                <select class="control-select" id="filterSelect">
+                    <option value="">הכל</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Chart -->
+        <div class="chart-container">
+            <div class="chart-header">
+                <div>
+                    <div class="chart-title">השוואת תקציבים לאורך זמן</div>
+                    <div class="chart-subtitle" id="chartSubtitle">מציג את כל התחומים ברמה 1</div>
+                </div>
+            </div>
+            <div class="chart-plot" id="lineChart"></div>
+        </div>
+
+        <!-- Items Selection -->
+        <div class="chart-container">
+            <div class="chart-header">
+                <div class="chart-title">בחירת פריטים להצגה</div>
+            </div>
+            <div style="padding: 20px;">
+                <div class="selection-controls">
+                    <button class="btn btn-primary" id="selectAllBtn">בחר הכל</button>
+                    <button class="btn" id="selectNoneBtn">בטל הכל</button>
+                    <button class="btn" id="selectTop10Btn">10 הגדולים</button>
+                </div>
+                <div class="items-grid" id="itemsGrid"></div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="data-table-container">
+            <div class="data-table-header">נתונים מפורטים (מיליארדי ש"ח)</div>
+            <div style="overflow-x: auto; max-height: 500px;">
+                <table class="data-table" id="dataTable">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        נתונים: משרד האוצר | פותח לצורכי ניתוח תקציבי
+    </footer>
+
+    <script>
+        // ============================================
+        // BUDGET DATA
+        // ============================================
+        const BUDGET_DATA = __BUDGET_DATA_PLACEHOLDER__;
+
+        // ============================================
+        // STATE
+        // ============================================
+        const state = {
+            currentLevel: 0,
+            selectedItems: new Set(),
+            allItems: [],
+            filterValue: '',
+            theme: localStorage.getItem('theme') || 'dark'
+        };
+
+        const years = Object.keys(BUDGET_DATA).map(Number).sort();
+        const levelNames = ['שם רמה 1', 'שם רמה 2', 'שם סעיף', 'שם תחום', 'שם תקנה', 'שם מיון רמה 1'];
+        const levelLabels = ['תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה', 'סוג הוצאה'];
+        const colors = ['#58a6ff', '#3fb950', '#a371f7', '#d29922', '#f85149', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16', '#f43f5e'];
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        function init() {
+            // Apply theme
+            document.documentElement.setAttribute('data-theme', state.theme);
+            updateThemeButton();
+
+            // Setup event listeners
+            document.getElementById('levelSelect').addEventListener('change', onLevelChange);
+            document.getElementById('filterSelect').addEventListener('change', onFilterChange);
+            document.getElementById('selectAllBtn').addEventListener('click', selectAll);
+            document.getElementById('selectNoneBtn').addEventListener('click', selectNone);
+            document.getElementById('selectTop10Btn').addEventListener('click', selectTop10);
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+            // Sidebar
+            document.getElementById('sidebarToggle').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.add('open');
+                document.getElementById('sidebarOverlay').classList.add('visible');
+            });
+            document.getElementById('sidebarClose').addEventListener('click', closeSidebar);
+            document.getElementById('sidebarOverlay').addEventListener('click', closeSidebar);
+
+            // Populate filter dropdown
+            populateFilterDropdown();
+
+            // Load initial data
+            loadLevelData(0);
+
+            // Hide loader
+            setTimeout(() => {
+                document.getElementById('loader').style.opacity = '0';
+                setTimeout(() => document.getElementById('loader').remove(), 500);
+            }, 500);
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('visible');
+        }
+
+        function toggleTheme() {
+            state.theme = state.theme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', state.theme);
+            localStorage.setItem('theme', state.theme);
+            updateThemeButton();
+            updateChart(); // Redraw with new colors
+        }
+
+        function updateThemeButton() {
+            document.getElementById('themeToggle').innerHTML = state.theme === 'dark' ? '&#9790;' : '&#9788;';
+        }
+
+        // ============================================
+        // DATA FUNCTIONS
+        // ============================================
+        function populateFilterDropdown() {
+            const select = document.getElementById('filterSelect');
+            const latestYear = years[years.length - 1];
+            const data = BUDGET_DATA[latestYear];
+
+            const level1Values = [...new Set(data.map(item => item.path[0]).filter(Boolean))].sort();
+
+            select.innerHTML = '<option value="">הכל</option>';
+            level1Values.forEach(val => {
+                select.innerHTML += `<option value="${val}">${val}</option>`;
+            });
+        }
+
+        function getItemsAtLevel(levelIndex, filterValue = '') {
+            const latestYear = years[years.length - 1];
+            const data = BUDGET_DATA[latestYear];
+
+            let filteredData = data;
+            if (filterValue) {
+                filteredData = data.filter(item => item.path[0] === filterValue);
+            }
+
+            // Aggregate by the selected level
+            const aggregated = {};
+            filteredData.forEach(item => {
+                const key = item.path[levelIndex];
+                if (key) {
+                    if (!aggregated[key]) {
+                        aggregated[key] = {
+                            name: key,
+                            value: 0,
+                            path: item.path.slice(0, levelIndex + 1),
+                            // Store all parent levels for tooltip
+                            parents: item.path.slice(0, levelIndex).filter(Boolean)
+                        };
+                    }
+                    aggregated[key].value += item.value;
+                }
+            });
+
+            return Object.values(aggregated).sort((a, b) => b.value - a.value);
+        }
+
+        function getTimeSeriesForItem(itemName, levelIndex, filterValue = '') {
+            return years.map(year => {
+                const data = BUDGET_DATA[year];
+                if (!data) return 0;
+
+                let filtered = data;
+                if (filterValue) {
+                    filtered = data.filter(item => item.path[0] === filterValue);
+                }
+
+                // Sum all items at this level with this name
+                let total = 0;
+                filtered.forEach(item => {
+                    if (item.path[levelIndex] === itemName) {
+                        total += item.value;
+                    }
+                });
+
+                return total / 1e6; // Convert to billions
+            });
+        }
+
+        // ============================================
+        // UI FUNCTIONS
+        // ============================================
+        function onLevelChange(e) {
+            state.currentLevel = parseInt(e.target.value);
+            loadLevelData(state.currentLevel);
+        }
+
+        function onFilterChange(e) {
+            state.filterValue = e.target.value;
+            loadLevelData(state.currentLevel);
+        }
+
+        function loadLevelData(levelIndex) {
+            state.allItems = getItemsAtLevel(levelIndex, state.filterValue);
+
+            // Select top 10 by default (or all if less than 10)
+            state.selectedItems = new Set(state.allItems.slice(0, 10).map(item => item.name));
+
+            renderItemsGrid();
+            updateChart();
+
+            const filterText = state.filterValue ? ` (מסונן ל: ${state.filterValue})` : '';
+            document.getElementById('chartSubtitle').textContent =
+                `מציג ${state.allItems.length} פריטים ברמת ${levelLabels[levelIndex]}${filterText}`;
+        }
+
+        function renderItemsGrid() {
+            const container = document.getElementById('itemsGrid');
+            container.innerHTML = state.allItems.map((item, index) => {
+                const color = colors[index % colors.length];
+                const isSelected = state.selectedItems.has(item.name);
+                const valueB = (item.value / 1e6).toFixed(1);
+                // Build parent path for tooltip
+                const parentPath = item.parents && item.parents.length > 0
+                    ? item.parents.join(' ← ')
+                    : 'תקציב המדינה';
+
+                return `
+                    <label class="item-checkbox ${isSelected ? 'selected' : ''}" data-name="${item.name}" title="מסלול: ${parentPath}">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleItem('${item.name.replace(/'/g, "\\'")}')">
+                        <span class="item-color" style="background: ${color}"></span>
+                        <div class="item-info">
+                            <span class="item-label">${item.name}</span>
+                            <span class="item-path">${parentPath}</span>
+                        </div>
+                        <span class="item-value">${valueB}B</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function toggleItem(name) {
+            if (state.selectedItems.has(name)) {
+                state.selectedItems.delete(name);
+            } else {
+                state.selectedItems.add(name);
+            }
+
+            // Update checkbox visual
+            document.querySelectorAll('.item-checkbox').forEach(el => {
+                const itemName = el.dataset.name;
+                el.classList.toggle('selected', state.selectedItems.has(itemName));
+            });
+
+            updateChart();
+        }
+
+        function selectAll() {
+            state.selectedItems = new Set(state.allItems.map(item => item.name));
+            renderItemsGrid();
+            updateChart();
+        }
+
+        function selectNone() {
+            state.selectedItems = new Set();
+            renderItemsGrid();
+            updateChart();
+        }
+
+        function selectTop10() {
+            state.selectedItems = new Set(state.allItems.slice(0, 10).map(item => item.name));
+            renderItemsGrid();
+            updateChart();
+        }
+
+        // ============================================
+        // CHART
+        // ============================================
+        function updateChart() {
+            const isDark = state.theme === 'dark';
+            const bgColor = isDark ? '#0d1117' : '#ffffff';
+            const gridColor = isDark ? '#30363d' : '#e5e7eb';
+            const textColor = isDark ? '#e6edf3' : '#1f2328';
+
+            if (state.selectedItems.size === 0) {
+                const layout = {
+                    paper_bgcolor: bgColor,
+                    plot_bgcolor: bgColor,
+                    font: { family: 'Heebo, sans-serif', color: textColor },
+                    margin: { l: 60, r: 30, t: 30, b: 50 },
+                    annotations: [{
+                        text: 'בחר פריטים להצגה',
+                        showarrow: false,
+                        font: { size: 18, color: textColor },
+                        xref: 'paper', yref: 'paper',
+                        x: 0.5, y: 0.5
+                    }]
+                };
+                Plotly.newPlot('lineChart', [], layout, { responsive: true, displayModeBar: false });
+                updateTable();
+                return;
+            }
+
+            const traces = [];
+            let colorIndex = 0;
+
+            state.allItems.forEach(item => {
+                if (state.selectedItems.has(item.name)) {
+                    const values = getTimeSeriesForItem(item.name, state.currentLevel, state.filterValue);
+                    // Build parent path for tooltip
+                    const parentPath = item.parents && item.parents.length > 0
+                        ? item.parents.join(' ← ')
+                        : 'תקציב המדינה';
+                    traces.push({
+                        x: years,
+                        y: values,
+                        name: item.name,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        line: { color: colors[colorIndex % colors.length], width: 3 },
+                        marker: { size: 8 },
+                        hovertemplate: `<b style="font-size:16px">${item.name}</b><br>` +
+                            `<span style="color:#8b949e">מסלול: ${parentPath}</span><br>` +
+                            `שנה: %{x}<br>` +
+                            `תקציב: <b>%{y:.2f}B</b> ש"ח<extra></extra>`
+                    });
+                    colorIndex++;
+                }
+            });
+
+            const layout = {
+                paper_bgcolor: bgColor,
+                plot_bgcolor: bgColor,
+                font: { family: 'Heebo, sans-serif', color: textColor, size: 14 },
+                margin: { l: 80, r: 30, t: 40, b: 60 },
+                xaxis: {
+                    gridcolor: gridColor,
+                    tickfont: { size: 14 },
+                    dtick: 1,
+                    title: { text: 'שנה', font: { size: 14 } }
+                },
+                yaxis: {
+                    gridcolor: gridColor,
+                    tickfont: { size: 14 },
+                    title: { text: 'מיליארדי ש"ח', font: { size: 14 } }
+                },
+                legend: {
+                    orientation: 'h',
+                    yanchor: 'bottom',
+                    y: 1.02,
+                    xanchor: 'right',
+                    x: 1,
+                    font: { size: 13 }
+                },
+                hovermode: 'x unified',
+                hoverlabel: {
+                    font: { size: 14 }
+                }
+            };
+
+            Plotly.newPlot('lineChart', traces, layout, { responsive: true, displayModeBar: false });
+            updateTable();
+        }
+
+        function updateTable() {
+            const table = document.getElementById('dataTable');
+
+            // Header
+            const headerRow = '<tr><th>פריט</th>' + years.map(y => `<th>${y}</th>`).join('') + '<th>שינוי %</th></tr>';
+
+            // Body - only selected items
+            const bodyRows = state.allItems
+                .filter(item => state.selectedItems.has(item.name))
+                .map(item => {
+                    const values = getTimeSeriesForItem(item.name, state.currentLevel, state.filterValue);
+                    const firstValue = values[0];
+                    const lastValue = values[values.length - 1];
+                    const changePct = firstValue > 0 ? ((lastValue - firstValue) / firstValue * 100) : 0;
+                    const isPositive = changePct >= 0;
+
+                    return `<tr>
+                        <td><strong>${item.name}</strong></td>
+                        ${values.map(v => `<td>${v.toFixed(2)}</td>`).join('')}
+                        <td class="${isPositive ? 'change-positive' : 'change-negative'}">${isPositive ? '+' : ''}${changePct.toFixed(1)}%</td>
+                    </tr>`;
+                }).join('');
+
+            table.querySelector('thead').innerHTML = headerRow;
+            table.querySelector('tbody').innerHTML = bodyRows;
+        }
+
+        // Make toggleItem global
+        window.toggleItem = toggleItem;
+
+        // ============================================
+        // START
+        // ============================================
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

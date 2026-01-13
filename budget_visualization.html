@@ -1,0 +1,1865 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>תקציב המדינה | ויזואליזציה אינטראקטיבית</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --bg-tertiary: #f0f2f5;
+            --border-color: #d0d7de;
+            --text-primary: #1f2328;
+            --text-secondary: #656d76;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 40px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .logo-text {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .logo-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Year Slider Container */
+        .year-slider-container {
+            background: var(--bg-tertiary);
+            border-radius: 16px;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .year-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .year-display {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .slider-wrapper {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .year-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+            outline: none;
+            cursor: pointer;
+        }
+
+        .year-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(88, 166, 255, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .year-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 30px rgba(88, 166, 255, 0.8);
+        }
+
+        .year-ticks {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            padding: 0 10px;
+        }
+
+        .year-tick {
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .year-tick:hover {
+            color: var(--accent-blue);
+        }
+
+        .year-tick.active {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            padding: 20px 40px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+
+        .stat-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px 24px;
+            min-width: 180px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-blue);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .stat-value.blue { color: var(--accent-blue); }
+        .stat-value.green { color: var(--accent-green); }
+        .stat-value.purple { color: var(--accent-purple); }
+        .stat-value.orange { color: var(--accent-orange); }
+
+        /* Main Content */
+        .main-content {
+            padding: 30px 40px;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        /* Treemap Container - Glass effect */
+        .treemap-container {
+            background: rgba(22, 27, 34, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 24px;
+            overflow: hidden;
+            position: relative;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .treemap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .treemap-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .breadcrumb-item {
+            cursor: pointer;
+            transition: color 0.2s;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .breadcrumb-item:hover {
+            color: var(--accent-blue);
+            background: var(--bg-tertiary);
+        }
+
+        .breadcrumb-separator {
+            color: var(--border-color);
+        }
+
+        .treemap-plot {
+            height: 700px;
+        }
+
+        /* Back Button - now in header */
+        .back-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            opacity: 0;
+            pointer-events: none;
+            margin-left: 15px;
+        }
+
+        .back-btn.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .back-btn:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        /* Loader */
+        .loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+
+        .loader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loader-text {
+            margin-top: 20px;
+            color: var(--text-secondary);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Info Panel */
+        .info-panel {
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .info-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .info-card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-card-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: var(--accent-blue);
+            border-radius: 2px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .legend-item:last-child {
+            border-bottom: none;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+
+        .legend-label {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .legend-value {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        /* Tooltip */
+        .custom-tooltip {
+            position: fixed;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s;
+            max-width: 300px;
+        }
+
+        .custom-tooltip.visible {
+            opacity: 1;
+        }
+
+        /* Salary indicator badge */
+        .salary-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            margin-right: 6px;
+        }
+
+        .salary-badge .salary-icon {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+
+        .salary-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .salary-legend-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .salary-legend-total {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent-orange);
+        }
+
+        .salary-legend .salary-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+        }
+
+        .salary-legend .salary-badge .salary-icon {
+            width: 12px;
+            height: 12px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* ============================================ */
+        /* SIDEBAR NAVIGATION */
+        /* ============================================ */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 280px;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 200;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .sidebar-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+
+        .sidebar-close:hover {
+            color: var(--text-primary);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+        }
+
+        .sidebar-nav-item {
+            margin-bottom: 8px;
+        }
+
+        .sidebar-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .sidebar-nav-link:hover {
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .sidebar-nav-link.active {
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.15);
+        }
+
+        .sidebar-nav-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .sidebar-nav-text {
+            flex: 1;
+        }
+
+        .sidebar-nav-label {
+            font-weight: 500;
+        }
+
+        .sidebar-nav-desc {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* Sidebar toggle button - fixed position top-right */
+        .sidebar-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 150;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-primary);
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        /* Sidebar overlay */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 190;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .sidebar-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* ============================================ */
+        /* LEVEL FILTER DROPDOWN */
+        /* ============================================ */
+        .level-filter-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-right: 20px;
+        }
+
+        .level-filter-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .level-filter {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            min-width: 150px;
+        }
+
+        .level-filter:hover, .level-filter:focus {
+            border-color: var(--accent-blue);
+            outline: none;
+        }
+
+        .level-filter option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        /* Theme toggle button */
+        .theme-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            color: var(--text-primary);
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        /* ============================================ */
+        /* MOBILE RESPONSIVE STYLES */
+        /* ============================================ */
+
+        /* Tablet and below */
+        @media (max-width: 1024px) {
+            .header {
+                padding: 15px 20px;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .year-slider-container {
+                width: 100%;
+                padding: 15px 20px;
+            }
+
+            .slider-wrapper {
+                min-width: 200px;
+            }
+
+            .stats-bar {
+                padding: 15px 20px;
+                gap: 10px;
+            }
+
+            .stat-card {
+                min-width: 140px;
+                padding: 12px 16px;
+            }
+
+            .stat-value {
+                font-size: 20px;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .treemap-plot {
+                height: 500px;
+            }
+
+            .info-panel {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Mobile phones */
+        @media (max-width: 768px) {
+            .header {
+                padding: 12px 15px;
+            }
+
+            .logo-text {
+                font-size: 18px;
+            }
+
+            .logo-subtitle {
+                font-size: 10px;
+            }
+
+            .logo-icon {
+                width: 32px;
+                height: 32px;
+                font-size: 16px;
+            }
+
+            .year-slider-container {
+                flex-direction: column;
+                gap: 10px;
+                padding: 12px 15px;
+            }
+
+            .year-display {
+                font-size: 28px;
+            }
+
+            .slider-wrapper {
+                width: 100%;
+                min-width: unset;
+            }
+
+            .year-ticks {
+                display: none; /* Hide ticks on mobile - too crowded */
+            }
+
+            .stats-bar {
+                padding: 10px 15px;
+                gap: 8px;
+                flex-wrap: nowrap;
+            }
+
+            .stat-card {
+                min-width: 100px;
+                padding: 10px 12px;
+                flex-shrink: 0;
+            }
+
+            .stat-label {
+                font-size: 10px;
+            }
+
+            .stat-value {
+                font-size: 16px;
+            }
+
+            .main-content {
+                padding: 15px;
+            }
+
+            .treemap-container {
+                border-radius: 16px;
+            }
+
+            .treemap-header {
+                flex-direction: column;
+                gap: 10px;
+                padding: 12px 15px;
+                align-items: flex-start;
+            }
+
+            .treemap-title {
+                font-size: 14px;
+                order: 2;
+            }
+
+            .breadcrumb {
+                font-size: 12px;
+                flex-wrap: wrap;
+                order: 3;
+            }
+
+            .back-btn {
+                order: 1;
+                margin-left: 0;
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+
+            .treemap-plot {
+                height: 400px;
+            }
+
+            .info-card {
+                padding: 16px;
+            }
+
+            .info-card-title {
+                font-size: 14px;
+            }
+
+            .legend-item {
+                padding: 8px 0;
+            }
+
+            .legend-label {
+                font-size: 12px;
+            }
+
+            .legend-value {
+                font-size: 12px;
+            }
+
+            .salary-legend {
+                font-size: 10px;
+                padding: 8px;
+            }
+
+            .footer {
+                padding: 20px;
+                font-size: 12px;
+            }
+        }
+
+        /* Small phones */
+        @media (max-width: 480px) {
+            .header {
+                padding: 10px 12px;
+            }
+
+            .logo {
+                gap: 8px;
+            }
+
+            .logo-text {
+                font-size: 16px;
+            }
+
+            .logo-icon {
+                width: 28px;
+                height: 28px;
+                font-size: 14px;
+            }
+
+            .year-display {
+                font-size: 24px;
+            }
+
+            .stats-bar {
+                padding: 8px 12px;
+            }
+
+            .stat-card {
+                min-width: 80px;
+                padding: 8px 10px;
+            }
+
+            .stat-label {
+                font-size: 9px;
+            }
+
+            .stat-value {
+                font-size: 14px;
+            }
+
+            .main-content {
+                padding: 10px;
+            }
+
+            .treemap-header {
+                padding: 10px 12px;
+            }
+
+            .treemap-title {
+                font-size: 12px;
+            }
+
+            .breadcrumb {
+                font-size: 11px;
+            }
+
+            .treemap-plot {
+                height: 350px;
+            }
+
+            .info-panel {
+                margin-top: 15px;
+                gap: 15px;
+            }
+
+            .info-card {
+                padding: 12px;
+            }
+        }
+
+        /* Landscape mobile */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .header {
+                position: relative; /* Not sticky in landscape */
+            }
+
+            .treemap-plot {
+                height: 60vh;
+            }
+
+            .stats-bar {
+                display: none; /* Hide stats in landscape to save space */
+            }
+        }
+
+        /* Sidebar responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+            }
+
+            .sidebar.open ~ .sidebar-toggle {
+                display: none;
+            }
+
+            .level-filter-container {
+                margin-right: 0;
+                margin-top: 10px;
+                width: 100%;
+            }
+
+            .level-filter {
+                flex: 1;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sidebar-nav-link {
+                padding: 12px;
+            }
+
+            .sidebar-nav-icon {
+                width: 28px;
+                height: 28px;
+                font-size: 14px;
+            }
+
+            .level-filter-label {
+                font-size: 12px;
+            }
+
+            .level-filter {
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loader -->
+    <div class="loader" id="loader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">טוען נתוני תקציב...</div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">₪</div>
+                <div>
+                    <div class="logo-text">תקציב המדינה</div>
+                    <div class="logo-subtitle">ויזואליזציה אינטראקטיבית | הוצאות נטו</div>
+                </div>
+            </div>
+
+            <div class="year-slider-container">
+                <span class="year-label">בחר שנה:</span>
+                <div class="year-display" id="yearDisplay">2024</div>
+                <div class="slider-wrapper">
+                    <input type="range" min="2015" max="2024" value="2024" class="year-slider" id="yearSlider">
+                    <div class="year-ticks" id="yearTicks"></div>
+                </div>
+            </div>
+
+            <div class="level-filter-container">
+                <span class="level-filter-label">קפוץ לרמה:</span>
+                <select class="level-filter" id="levelFilter">
+                    <option value="0">תקציב המדינה</option>
+                    <option value="1">תחום</option>
+                    <option value="2">תת-תחום</option>
+                    <option value="3">משרד</option>
+                    <option value="4">תחום פעילות</option>
+                    <option value="5">תקנה</option>
+                    <option value="6">סוג הוצאה</option>
+                </select>
+            </div>
+
+            <button class="theme-toggle" id="themeToggle" title="החלף מצב תצוגה">&#9790;</button>
+        </div>
+    </header>
+
+    <!-- Sidebar Toggle Button - Fixed Top Right -->
+    <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar" id="statsBar">
+        <div class="stat-card">
+            <div class="stat-label">סה"כ תקציב</div>
+            <div class="stat-value blue" id="totalBudget">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">תחום גדול ביותר</div>
+            <div class="stat-value green" id="topCategory">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">מספר משרדים</div>
+            <div class="stat-value purple" id="ministryCount">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">רמת הצגה נוכחית</div>
+            <div class="stat-value orange" id="currentLevel">תקציב המדינה</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="treemap-container">
+            <div class="treemap-header">
+                <button class="back-btn" id="backBtn">
+                    <span>→</span> חזרה
+                </button>
+                <div class="treemap-title">מבנה התקציב | לחץ על תחום לכניסה פנימה</div>
+                <div class="breadcrumb" id="breadcrumb">
+                    <span class="breadcrumb-item active" data-level="0">תקציב המדינה</span>
+                </div>
+            </div>
+            <div class="treemap-plot" id="treemapPlot"></div>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-card">
+                <div class="info-card-title">מקרא צבעים (לפי תחום)</div>
+                <div id="colorLegend">
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-title">הוראות שימוש</div>
+                <p style="color: var(--text-secondary); line-height: 1.8;">
+                    • גרור את הסליידר למעלה לבחירת שנה<br>
+                    • לחץ על כל קופסא כדי לראות פירוט<br>
+                    • לחץ "חזרה" או על הנתיב למעלה לחזור<br>
+                    • רחף מעל קופסא לפרטים נוספים
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        נתונים: משרד האוצר | פותח לצורכי ניתוח תקציבי
+    </footer>
+
+    <!-- Sidebar Navigation -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">ויזואליזציות נוספות</span>
+            <button class="sidebar-close" id="sidebarClose">&times;</button>
+        </div>
+        <div class="sidebar-content">
+            <ul class="sidebar-nav">
+                <li class="sidebar-nav-item">
+                    <a href="budget_interactive.html" class="sidebar-nav-link active">
+                        <span class="sidebar-nav-icon">&#9632;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">תקציב אינטראקטיבי</div>
+                            <div class="sidebar-nav-desc">Treemap עם ניתוח לפי רמות</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="time_series.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#8593;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">השוואה שנתית</div>
+                            <div class="sidebar-nav-desc">מגמות לאורך זמן</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="salary_percentage.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#8362;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">אחוזי שכר</div>
+                            <div class="sidebar-nav-desc">גמישות תקציבית לפי משרד</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="ministry_overview.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#9962;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">סקירת משרדים</div>
+                            <div class="sidebar-nav-desc">השוואה בין משרדים</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="sunburst_budget.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#9788;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">Sunburst</div>
+                            <div class="sidebar-nav-desc">תרשים שמש היררכי</div>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </aside>
+
+    <script>
+        // ============================================
+        // BUDGET DATA - Will be populated by Python
+        // ============================================
+        const BUDGET_DATA = __BUDGET_DATA_PLACEHOLDER__;
+
+        // ============================================
+        // STATE MANAGEMENT
+        // ============================================
+        const state = {
+            currentYear: 2024,
+            currentPath: [],
+            currentData: null,
+            hierarchy: ['שם רמה 1', 'שם רמה 2', 'שם סעיף', 'שם תחום', 'שם תקנה', 'שם מיון רמה 1'],
+            levelNames: ['תקציב המדינה', 'תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה', 'סוג הוצאה'],
+            flatViewLevel: null  // When set, shows ALL items at this level across entire budget
+        };
+
+        // ============================================
+        // PLOTLY CONFIG
+        // ============================================
+        const plotlyConfig = {
+            responsive: true,
+            displayModeBar: false,
+            displaylogo: false
+        };
+
+        const plotlyLayout = {
+            margin: { l: 10, r: 10, t: 10, b: 10 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            font: {
+                family: 'Heebo, sans-serif',
+                color: '#e6edf3'
+            }
+        };
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        function init() {
+            // Create year ticks
+            const ticksContainer = document.getElementById('yearTicks');
+            for (let year = 2015; year <= 2024; year++) {
+                const tick = document.createElement('span');
+                tick.className = 'year-tick' + (year === 2024 ? ' active' : '');
+                tick.textContent = year;
+                tick.onclick = () => setYear(year);
+                ticksContainer.appendChild(tick);
+            }
+
+            // Slider event
+            document.getElementById('yearSlider').addEventListener('input', (e) => {
+                setYear(parseInt(e.target.value));
+            });
+
+            // Back button
+            document.getElementById('backBtn').addEventListener('click', goBack);
+
+            // Sidebar toggle
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const sidebarClose = document.getElementById('sidebarClose');
+            const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+            function openSidebar() {
+                sidebar.classList.add('open');
+                sidebarOverlay.classList.add('visible');
+            }
+
+            function closeSidebar() {
+                sidebar.classList.remove('open');
+                sidebarOverlay.classList.remove('visible');
+            }
+
+            sidebarToggle.addEventListener('click', openSidebar);
+            sidebarClose.addEventListener('click', closeSidebar);
+            sidebarOverlay.addEventListener('click', closeSidebar);
+
+            // Level filter
+            document.getElementById('levelFilter').addEventListener('change', handleLevelFilter);
+
+            // Theme toggle
+            initTheme();
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+            // Load initial data
+            loadYear(2024);
+
+            // Hide loader
+            setTimeout(() => {
+                document.getElementById('loader').style.opacity = '0';
+                setTimeout(() => document.getElementById('loader').remove(), 500);
+            }, 500);
+        }
+
+        // ============================================
+        // THEME MANAGEMENT
+        // ============================================
+        function initTheme() {
+            const savedTheme = localStorage.getItem('budget-theme') || 'dark';
+            applyTheme(savedTheme);
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('budget-theme', newTheme);
+            applyTheme(newTheme);
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            if (theme === 'dark') {
+                document.getElementById('themeToggle').innerHTML = '&#9790;';
+            } else {
+                document.getElementById('themeToggle').innerHTML = '&#9788;';
+            }
+        }
+
+        // ============================================
+        // YEAR HANDLING
+        // ============================================
+        function setYear(year, keepPath = true) {
+            state.currentYear = year;
+            document.getElementById('yearDisplay').textContent = year;
+            document.getElementById('yearSlider').value = year;
+
+            // Update ticks
+            document.querySelectorAll('.year-tick').forEach(tick => {
+                tick.classList.toggle('active', parseInt(tick.textContent) === year);
+            });
+
+            // Keep current path when changing years (don't reset to root)
+            // This allows comparing the same drill-down level across years
+            if (!keepPath) {
+                state.currentPath = [];
+            }
+            loadYear(year);
+        }
+
+        function loadYear(year) {
+            const yearData = BUDGET_DATA[year];
+            if (!yearData) {
+                console.error('No data for year:', year);
+                return;
+            }
+
+            state.currentData = yearData;
+
+            // Validate that the current path exists in this year's data
+            // If not, trim the path to the last valid level
+            const validPath = validatePathForYear(yearData, state.currentPath);
+            if (validPath.length !== state.currentPath.length) {
+                state.currentPath = validPath;
+                updateBreadcrumb();
+                updateLevelFilter();
+            }
+
+            updateStats(yearData);
+            renderTreemap(yearData, state.currentPath);
+        }
+
+        // Validate that the path exists in the year's data
+        function validatePathForYear(data, path) {
+            let validPath = [];
+            let filteredData = data;
+
+            for (let i = 0; i < path.length; i++) {
+                // Check if this path segment exists in the data
+                const matchingItems = filteredData.filter(item => item.path[i] === path[i]);
+                if (matchingItems.length === 0) {
+                    // Path doesn't exist in this year - stop here
+                    break;
+                }
+                validPath.push(path[i]);
+                filteredData = matchingItems;
+            }
+
+            return validPath;
+        }
+
+        // ============================================
+        // STATS UPDATE
+        // ============================================
+        function updateStats(data) {
+            // Check if in flat view mode
+            const isFlatView = state.flatViewLevel !== null;
+            const levelIndex = isFlatView ? state.flatViewLevel : state.currentPath.length;
+
+            // Filter by current path (only in hierarchical mode)
+            let filteredData = data;
+            if (!isFlatView) {
+                for (let i = 0; i < state.currentPath.length; i++) {
+                    filteredData = filteredData.filter(item => item.path[i] === state.currentPath[i]);
+                }
+            }
+
+            // Total budget at current level
+            const total = filteredData.reduce((sum, item) => sum + item.value, 0);
+            document.getElementById('totalBudget').textContent = formatBillions(total) + ' מיליארד';
+
+            // Top category at current level - aggregate by the level index
+            const aggregated = {};
+            filteredData.forEach(item => {
+                const key = item.path[levelIndex];
+                if (key) {
+                    if (!aggregated[key]) aggregated[key] = 0;
+                    aggregated[key] += item.value;
+                }
+            });
+
+            const sorted = Object.entries(aggregated).sort((a, b) => b[1] - a[1]);
+            document.getElementById('topCategory').textContent = sorted.length > 0 ? sorted[0][0] : '--';
+
+            // Count unique items at current display level
+            document.getElementById('ministryCount').textContent = sorted.length;
+
+            // Current level
+            document.getElementById('currentLevel').textContent = state.levelNames[levelIndex];
+        }
+
+        // ============================================
+        // TREEMAP RENDERING - Build hierarchical structure
+        // ============================================
+
+        // Finviz-style colors - each category has distinct color with shades
+        const categoryColors = {
+            'בטחון וסדר ציבורי': { base: [0, 128, 0], light: [144, 238, 144] },      // Green
+            'שירותים חברתיים': { base: [0, 100, 180], light: [100, 180, 255] },     // Blue
+            'משרדי מטה': { base: [128, 0, 128], light: [200, 150, 200] },           // Purple
+            'תשתיות': { base: [200, 100, 0], light: [255, 180, 100] },              // Orange
+            'ענפי משק': { base: [180, 150, 0], light: [255, 220, 100] },            // Yellow/Gold
+            'הוצאות אחרות': { base: [180, 0, 0], light: [255, 120, 120] },          // Red
+            'החזר חובות': { base: [80, 80, 80], light: [160, 160, 160] },           // Gray
+            'רזרבות': { base: [0, 128, 128], light: [100, 200, 200] }               // Teal
+        };
+
+        function renderTreemap(data, path) {
+            // Check if we're in flat view mode (showing ALL items at a specific level)
+            const isFlatView = state.flatViewLevel !== null;
+            const levelIndex = isFlatView ? state.flatViewLevel : path.length;
+
+            if (levelIndex >= state.hierarchy.length) {
+                console.log('Max depth reached');
+                return;
+            }
+
+            // Filter data by current path (only in hierarchical mode)
+            let filteredData = data;
+            if (!isFlatView) {
+                for (let i = 0; i < path.length; i++) {
+                    filteredData = filteredData.filter(item => item.path[i] === path[i]);
+                }
+            }
+
+            // Build hierarchical data: current level (level1) AND next level (level2)
+            const ids = ['root'];
+            const labels = ['תקציב'];
+            const parents = [''];
+            const values = [];
+            const colors = [];
+            const customdata = [];
+            const textArray = [''];
+
+            // Aggregate current level (level 1)
+            const level1Aggregated = {};
+            filteredData.forEach(item => {
+                const key = item.path[levelIndex];
+                if (key) {
+                    if (!level1Aggregated[key]) {
+                        level1Aggregated[key] = { name: key, value: 0, children: [], rawItems: [], salaryValue: 0 };
+                    }
+                    level1Aggregated[key].value += item.value;
+                    level1Aggregated[key].rawItems.push(item);
+                    // Track salary portion
+                    if (item.isSalary) {
+                        level1Aggregated[key].salaryValue += item.value;
+                    }
+                }
+            });
+
+            // Sort level 1 by value
+            const level1Data = Object.values(level1Aggregated).sort((a, b) => b.value - a.value);
+            const total = level1Data.reduce((sum, item) => sum + item.value, 0);
+
+            // Root values
+            values.push(total);
+            colors.push('rgba(0,0,0,0)');
+            customdata.push({ pct: 100, billions: formatBillions(total), fullNumber: total.toLocaleString('he-IL'), level: -1 });
+
+            // Get parent category for drill-down coloring
+            let parentCategory = path.length > 0 ? path[0] : null;
+            let baseColorSet = parentCategory && categoryColors[parentCategory]
+                ? categoryColors[parentCategory]
+                : null;
+
+            // Calculate min/max for color gradient
+            const maxValue = level1Data.length > 0 ? level1Data[0].value : 1;
+            const minValue = level1Data.length > 0 ? level1Data[level1Data.length - 1].value : 0;
+
+            // For flat view, get parent category from each item's path
+            function getParentCategory(item) {
+                return item.rawItems && item.rawItems.length > 0 ? item.rawItems[0].path[0] : null;
+            }
+
+            // Generate color for item
+            function getItemColor(itemName, itemValue, isLevel1, itemData = null) {
+                if (isFlatView && itemData) {
+                    // Flat view - color by parent category (תחום)
+                    const parentCat = getParentCategory(itemData);
+                    const catColor = categoryColors[parentCat];
+                    if (catColor) {
+                        // Use a gradient based on value within the category color
+                        const range = maxValue - minValue || 1;
+                        const ratio = (itemValue - minValue) / range;
+                        const r = Math.round(catColor.light[0] + (catColor.base[0] - catColor.light[0]) * ratio);
+                        const g = Math.round(catColor.light[1] + (catColor.base[1] - catColor.light[1]) * ratio);
+                        const b = Math.round(catColor.light[2] + (catColor.base[2] - catColor.light[2]) * ratio);
+                        return `rgb(${r}, ${g}, ${b})`;
+                    }
+                    // Fallback gradient
+                    const range = maxValue - minValue || 1;
+                    const ratio = (itemValue - minValue) / range;
+                    const intensity = Math.round(80 + 120 * ratio);
+                    return `rgb(${Math.round(intensity * 0.5)}, ${Math.round(intensity * 0.6)}, ${intensity})`;
+                } else if (path.length === 0 && isLevel1 && !isFlatView) {
+                    // Root level - use category base colors
+                    const catColor = categoryColors[itemName];
+                    if (catColor) {
+                        return `rgb(${catColor.base[0]}, ${catColor.base[1]}, ${catColor.base[2]})`;
+                    }
+                    // Fallback
+                    return 'rgb(70, 130, 180)';
+                } else if (baseColorSet) {
+                    // Drill-down level - gradient from dark (large) to light (small)
+                    const range = maxValue - minValue || 1;
+                    const ratio = (itemValue - minValue) / range;
+                    const r = Math.round(baseColorSet.light[0] + (baseColorSet.base[0] - baseColorSet.light[0]) * ratio);
+                    const g = Math.round(baseColorSet.light[1] + (baseColorSet.base[1] - baseColorSet.light[1]) * ratio);
+                    const b = Math.round(baseColorSet.light[2] + (baseColorSet.base[2] - baseColorSet.light[2]) * ratio);
+                    return `rgb(${r}, ${g}, ${b})`;
+                } else if (path.length === 0) {
+                    // Level 2 at root - inherit parent color but lighter
+                    return 'rgba(100, 150, 200, 0.8)';
+                } else {
+                    // Fallback gradient
+                    const range = maxValue - minValue || 1;
+                    const ratio = (itemValue - minValue) / range;
+                    const intensity = Math.round(80 + 120 * ratio);
+                    return `rgb(${Math.round(intensity * 0.3)}, ${Math.round(intensity * 0.5)}, ${intensity})`;
+                }
+            }
+
+            // Track level 1 items for click handling
+            const level1Items = [];
+            const isLevel1Deepest = (levelIndex >= 5);  // Current level is שם מיון רמה 1 (deepest)
+            const nextLevelIndex = levelIndex + 1;
+            const hasNextLevel = nextLevelIndex < state.hierarchy.length;
+
+            // Add level 1 items (children of root)
+            level1Data.forEach((item, idx) => {
+                const id = `L1_${idx}`;
+                const pct = (item.value / total * 100);
+                const billions = formatBillions(item.value);
+                const salaryPct = item.value > 0 ? (item.salaryValue / item.value * 100) : 0;
+                const hasSalary = salaryPct > 0;
+
+                ids.push(id);
+                labels.push(item.name);
+                parents.push('root');
+                values.push(item.value);
+                colors.push(getItemColor(item.name, item.value, true, item));
+                customdata.push({
+                    pct: pct.toFixed(1),
+                    billions,
+                    fullNumber: item.value.toLocaleString('he-IL'),
+                    level: 1,
+                    hasChildren: hasNextLevel && item.rawItems.some(ri => ri.path[nextLevelIndex]),
+                    salaryPct: salaryPct.toFixed(1),
+                    hasSalary: hasSalary,
+                    salaryValue: item.salaryValue
+                });
+
+                // Text for level 1 - adaptive based on box size (percentage)
+                // Use ₪ symbol for salary indicator (positioned at start of text for visibility)
+                const salaryIndicator = hasSalary && salaryPct >= 5 ? `<br><span style="font-size:1.2em;color:#fbbf24">₪ ${salaryPct.toFixed(0)}%</span>` : '';
+
+                if (pct >= 15) {
+                    // Very large boxes - extra large text with full info
+                    if (isLevel1Deepest) {
+                        const fullNum = item.value.toLocaleString('he-IL', {maximumFractionDigits: 0});
+                        textArray.push(`<b style="font-size:1.6em">${item.name}</b><br><span style="font-size:1.3em">${pct.toFixed(1)}%</span><br>${fullNum} אלפי ש"ח${salaryIndicator}`);
+                    } else {
+                        textArray.push(`<b style="font-size:1.6em">${item.name}</b><br><span style="font-size:1.3em">${pct.toFixed(1)}%</span><br>${billions}B${salaryIndicator}`);
+                    }
+                } else if (pct >= 8) {
+                    // Large boxes - full info with salary indicator
+                    if (isLevel1Deepest) {
+                        const fullNum = item.value.toLocaleString('he-IL', {maximumFractionDigits: 0});
+                        textArray.push(`<b style="font-size:1.3em">${item.name}</b><br>${pct.toFixed(1)}%<br>${fullNum} אלפי ש"ח${salaryIndicator}`);
+                    } else {
+                        textArray.push(`<b style="font-size:1.3em">${item.name}</b><br>${pct.toFixed(1)}%<br>${billions}B${salaryIndicator}`);
+                    }
+                } else if (pct >= 3) {
+                    // Medium boxes - name, percentage and salary
+                    textArray.push(`<b>${item.name}</b><br>${pct.toFixed(1)}%${salaryIndicator}`);
+                } else if (pct >= 1) {
+                    // Small boxes - just name
+                    textArray.push(`${item.name}`);
+                } else {
+                    // Very small boxes - no text
+                    textArray.push('');
+                }
+
+                level1Items.push({ id, name: item.name, rawItems: item.rawItems, value: item.value, salaryValue: item.salaryValue });
+            });
+
+            // No level 2 - we show only one level at a time with maxdepth: 1
+
+            // Dynamic hover template based on depth - with salary info
+            const hoverTpl = isLevel1Deepest
+                ? '<b>%{label}</b><br>סכום: %{customdata.fullNumber} אלפי ש"ח<br>אחוז: %{customdata.pct}%<br>שכר: %{customdata.salaryPct}%<extra></extra>'
+                : '<b>%{label}</b><br>סכום: %{customdata.billions} מיליארד ש"ח<br>אחוז: %{customdata.pct}%<br>שכר: %{customdata.salaryPct}%<extra></extra>';
+
+            const trace = {
+                type: 'treemap',
+                ids: ids,
+                labels: labels,
+                parents: parents,
+                values: values,
+                customdata: customdata,
+                text: textArray,
+                texttemplate: '%{text}',
+                hovertemplate: hoverTpl,
+                textfont: {
+                    color: '#ffffff',
+                    family: 'Heebo, sans-serif',
+                    size: 16
+                },
+                insidetextfont: {
+                    size: 18  // Larger base size for inside text
+                },
+                outsidetextfont: {
+                    size: 12
+                },
+                textposition: 'middle center',
+                marker: {
+                    colors: colors,
+                    line: { width: 2, color: '#1a1a2e' },
+                    pad: { t: 4, l: 4, r: 4, b: 4 }
+                },
+                pathbar: { visible: false },
+                branchvalues: 'total',
+                maxdepth: 2,  // Show root + children
+                root: { color: 'rgba(0,0,0,0)' },
+                tiling: {
+                    packing: 'squarify',
+                    pad: 2
+                }
+            };
+
+            // Use newPlot instead of react to avoid caching issues
+            Plotly.newPlot('treemapPlot', [trace], plotlyLayout, plotlyConfig);
+
+            const plotDiv = document.getElementById('treemapPlot');
+
+            // Click handler - drill-down using sunburstclick/treemapclick
+            // This fires BEFORE any internal zoom happens
+            plotDiv.on('plotly_sunburstclick', handleClick);
+            plotDiv.on('plotly_treemapclick', handleClick);
+
+            function handleClick(eventData) {
+                if (eventData.points && eventData.points[0]) {
+                    const point = eventData.points[0];
+                    const label = point.label;
+                    const idx = point.pointNumber;
+
+                    // Skip root click
+                    if (point.id === 'root' || label === 'תקציב') {
+                        return false; // Prevent default behavior
+                    }
+
+                    // Get customdata for this point
+                    const pointData = customdata[idx];
+
+                    if (isFlatView) {
+                        // In flat view, clicking an item doesn't drill down (already at target level)
+                        // Could show a tooltip or do nothing
+                        return false;
+                    }
+
+                    if (pointData && pointData.hasChildren) {
+                        // Add clicked item to path - drill down
+                        state.currentPath = [...path, label];
+                        state.flatViewLevel = null;  // Exit flat view when drilling down
+                        updateBreadcrumb();
+                        updateStats(data);
+                        renderTreemap(data, state.currentPath);
+                        updateBackButton();
+                        updateLevelFilter();
+                    } else if (state.currentPath.length > 0) {
+                        // At deepest level (no children) - go back one level
+                        goBack();
+                    }
+                }
+                // Return false to prevent Plotly's built-in zoom
+                return false;
+            }
+
+            updateBackButton();
+
+            // Update legend with level 1 items
+            const legendColors = level1Data.map(item => getItemColor(item.name, item.value, true));
+            updateColorLegend(level1Data, legendColors, total);
+        }
+
+        // ============================================
+        // NAVIGATION
+        // ============================================
+        function goBack() {
+            if (state.flatViewLevel !== null) {
+                // Exit flat view mode and go back to root
+                state.flatViewLevel = null;
+                state.currentPath = [];
+                updateBreadcrumb();
+                updateStats(state.currentData);
+                renderTreemap(state.currentData, state.currentPath);
+                updateLevelFilter();
+                updateBackButton();
+            } else if (state.currentPath.length > 0) {
+                state.currentPath.pop();
+                updateBreadcrumb();
+                updateStats(state.currentData);
+                renderTreemap(state.currentData, state.currentPath);
+                updateLevelFilter();
+                updateBackButton();
+            }
+        }
+
+        function goToLevel(level) {
+            state.flatViewLevel = null;  // Exit flat view when navigating via breadcrumb
+            state.currentPath = state.currentPath.slice(0, level);
+            updateBreadcrumb();
+            updateStats(state.currentData);
+            renderTreemap(state.currentData, state.currentPath);
+            updateLevelFilter();
+            updateBackButton();
+        }
+
+        // Handle level filter dropdown change
+        function handleLevelFilter(e) {
+            const targetLevel = parseInt(e.target.value);
+
+            if (targetLevel === 0) {
+                // Back to root - normal hierarchical view
+                state.flatViewLevel = null;
+                state.currentPath = [];
+            } else {
+                // Show ALL items at this level across entire budget (flat view)
+                state.flatViewLevel = targetLevel;
+                state.currentPath = [];  // Clear path for flat view
+            }
+
+            updateBreadcrumb();
+            updateStats(state.currentData);
+            renderTreemap(state.currentData, state.currentPath);
+        }
+
+        // Update level filter dropdown to match current level
+        function updateLevelFilter() {
+            if (state.flatViewLevel !== null) {
+                document.getElementById('levelFilter').value = state.flatViewLevel;
+            } else {
+                document.getElementById('levelFilter').value = state.currentPath.length;
+            }
+        }
+
+        function updateBreadcrumb() {
+            const container = document.getElementById('breadcrumb');
+            container.innerHTML = '';
+
+            // Check if in flat view mode
+            if (state.flatViewLevel !== null) {
+                // Show flat view breadcrumb
+                const root = document.createElement('span');
+                root.className = 'breadcrumb-item';
+                root.textContent = 'תקציב המדינה';
+                root.onclick = () => {
+                    state.flatViewLevel = null;
+                    state.currentPath = [];
+                    updateBreadcrumb();
+                    updateStats(state.currentData);
+                    renderTreemap(state.currentData, state.currentPath);
+                    updateLevelFilter();
+                };
+                container.appendChild(root);
+
+                const sep = document.createElement('span');
+                sep.className = 'breadcrumb-separator';
+                sep.textContent = ' ← ';
+                container.appendChild(sep);
+
+                const levelCrumb = document.createElement('span');
+                levelCrumb.className = 'breadcrumb-item active';
+                levelCrumb.textContent = `כל ה${state.levelNames[state.flatViewLevel]} (תצוגה שטוחה)`;
+                container.appendChild(levelCrumb);
+
+                document.getElementById('currentLevel').textContent = state.levelNames[state.flatViewLevel];
+                return;
+            }
+
+            // Regular hierarchical breadcrumb
+            // Root
+            const root = document.createElement('span');
+            root.className = 'breadcrumb-item' + (state.currentPath.length === 0 ? ' active' : '');
+            root.textContent = 'תקציב המדינה';
+            root.onclick = () => goToLevel(0);
+            container.appendChild(root);
+
+            // Path items
+            state.currentPath.forEach((item, index) => {
+                const sep = document.createElement('span');
+                sep.className = 'breadcrumb-separator';
+                sep.textContent = ' ← ';
+                container.appendChild(sep);
+
+                const crumb = document.createElement('span');
+                crumb.className = 'breadcrumb-item' + (index === state.currentPath.length - 1 ? ' active' : '');
+                crumb.textContent = item;
+                crumb.onclick = () => goToLevel(index + 1);
+                container.appendChild(crumb);
+            });
+
+            document.getElementById('currentLevel').textContent = state.levelNames[state.currentPath.length];
+        }
+
+        function updateBackButton() {
+            const btn = document.getElementById('backBtn');
+            btn.classList.toggle('visible', state.currentPath.length > 0 || state.flatViewLevel !== null);
+        }
+
+        // SVG icon for salary badge
+        const salaryIconSVG = `<svg class="salary-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z"/></svg>`;
+
+        function updateColorLegend(data, colors, total) {
+            const container = document.getElementById('colorLegend');
+            container.innerHTML = '';
+
+            // Calculate total salary for all displayed items
+            let totalSalary = 0;
+            data.forEach(item => {
+                totalSalary += item.salaryValue || 0;
+            });
+
+            data.slice(0, 8).forEach((item, index) => {
+                const pct = (item.value / total * 100).toFixed(1);
+                const salaryPct = item.value > 0 ? (item.salaryValue / item.value * 100) : 0;
+                const salaryBadge = salaryPct >= 5 ? `<span class="salary-badge">${salaryIconSVG} ${salaryPct.toFixed(0)}%</span>` : '';
+                const div = document.createElement('div');
+                div.className = 'legend-item';
+                div.innerHTML = `
+                    <div class="legend-color" style="background: ${colors[index % colors.length]};"></div>
+                    <span class="legend-label">${item.name} ${salaryBadge}</span>
+                    <span class="legend-value">${pct}%</span>
+                `;
+                container.appendChild(div);
+            });
+
+            // Add salary legend explanation with total
+            const totalSalaryBillions = formatBillions(totalSalary);
+            const totalSalaryPct = total > 0 ? (totalSalary / total * 100).toFixed(1) : 0;
+            const salaryLegendDiv = document.createElement('div');
+            salaryLegendDiv.className = 'salary-legend';
+            salaryLegendDiv.innerHTML = `
+                <div class="salary-legend-header">
+                    <span class="salary-badge">${salaryIconSVG}</span>
+                    <span>אחוז שכר מתוך ההוצאה (מוצג כאשר >= 5%)</span>
+                </div>
+                <div class="salary-legend-total">
+                    סה"כ שכר ברמה זו: ${totalSalaryBillions} מיליארד ש"ח (${totalSalaryPct}%)
+                </div>
+            `;
+            container.appendChild(salaryLegendDiv);
+        }
+
+        // ============================================
+        // UTILITIES
+        // ============================================
+        function formatBillions(value) {
+            return (value / 1e6).toFixed(1);
+        }
+
+        // ============================================
+        // START
+        // ============================================
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

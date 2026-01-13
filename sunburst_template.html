@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunburst | תקציב המדינה</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --bg-tertiary: #f0f2f5;
+            --border-color: #d0d7de;
+            --text-primary: #1f2328;
+            --text-secondary: #656d76;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        .header {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 40px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-green));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .logo-text { font-size: 24px; font-weight: 600; }
+        .logo-subtitle { font-size: 12px; color: var(--text-secondary); }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .control-select {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 16px;
+            color: var(--text-primary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            min-width: 140px;
+        }
+
+        .control-select:hover, .control-select:focus {
+            border-color: var(--accent-blue);
+            outline: none;
+        }
+
+        .theme-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .main-content {
+            padding: 30px 40px;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .chart-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .chart-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .chart-title { font-size: 18px; font-weight: 600; }
+        .chart-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+        .chart-plot {
+            height: 750px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chart-plot .js-plotly-plot,
+        .chart-plot .plotly {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .chart-plot .js-plotly-plot .main-svg {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .back-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .back-btn.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .back-btn:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            padding: 20px 24px;
+            border-top: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .stat-value.blue { color: var(--accent-blue); }
+        .stat-value.green { color: var(--accent-green); }
+        .stat-value.orange { color: var(--accent-orange); }
+
+        /* Sidebar Toggle - fixed top-right */
+        .sidebar-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 150;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 14px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 18px;
+            transition: all 0.2s;
+            line-height: 1;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 200;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.open { transform: translateX(0); }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-title { font-size: 18px; font-weight: 600; }
+
+        .sidebar-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 28px;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .sidebar-close:hover { color: var(--text-primary); }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .sidebar-nav { list-style: none; }
+        .sidebar-nav-item { margin-bottom: 10px; }
+
+        .sidebar-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .sidebar-nav-link:hover {
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .sidebar-nav-link.active {
+            border-color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.15);
+        }
+
+        .sidebar-nav-icon { font-size: 20px; }
+        .sidebar-nav-text { flex: 1; }
+        .sidebar-nav-label { font-weight: 500; }
+        .sidebar-nav-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 190;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .sidebar-overlay.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .header-content { flex-direction: column; }
+            .header-controls { width: 100%; justify-content: center; }
+        }
+
+        @media (max-width: 768px) {
+            .header { padding: 15px 20px; }
+            .main-content { padding: 15px; }
+            .chart-plot { height: 500px; }
+            .sidebar { width: 100%; }
+            .logo-text { font-size: 20px; }
+            .sidebar-toggle { top: 15px; right: 15px; padding: 10px; }
+            .stats-bar { gap: 15px; }
+        }
+
+        @media (max-width: 480px) {
+            .chart-plot { height: 400px; }
+            .control-group { width: 100%; }
+            .control-select { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">ויזואליזציות</span>
+            <button class="sidebar-close" id="sidebarClose">&times;</button>
+        </div>
+        <div class="sidebar-content">
+            <ul class="sidebar-nav">
+                <li class="sidebar-nav-item">
+                    <a href="budget_interactive.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#9632;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">תקציב אינטראקטיבי</div>
+                            <div class="sidebar-nav-desc">Treemap עם ניתוח לפי רמות</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="time_series.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#8593;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">השוואה שנתית</div>
+                            <div class="sidebar-nav-desc">מגמות לאורך זמן</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="salary_percentage.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#8362;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">אחוזי שכר</div>
+                            <div class="sidebar-nav-desc">גמישות תקציבית לפי משרד</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="ministry_overview.html" class="sidebar-nav-link">
+                        <span class="sidebar-nav-icon">&#9962;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">סקירת משרדים</div>
+                            <div class="sidebar-nav-desc">השוואה בין משרדים</div>
+                        </div>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="sunburst_budget.html" class="sidebar-nav-link active">
+                        <span class="sidebar-nav-icon">&#9788;</span>
+                        <div class="sidebar-nav-text">
+                            <div class="sidebar-nav-label">Sunburst</div>
+                            <div class="sidebar-nav-desc">תרשים שמש היררכי</div>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </aside>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">&#9788;</div>
+                <div>
+                    <div class="logo-text">תרשים Sunburst</div>
+                    <div class="logo-subtitle">ויזואליזציה היררכית של תקציב המדינה | עד רמת תקנה</div>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="control-group">
+                    <span class="control-label">עומק תצוגה:</span>
+                    <select class="control-select" id="depthSelect">
+                        <option value="2">2 רמות</option>
+                        <option value="3">3 רמות</option>
+                        <option value="4" selected>4 רמות</option>
+                        <option value="5">5 רמות (עד תקנה)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">שנה:</span>
+                    <select class="control-select" id="yearSelect"></select>
+                </div>
+                <button class="theme-toggle" id="themeToggle" title="החלף מצב תצוגה">&#9790;</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar Toggle Button - Fixed Top Right -->
+    <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="chart-container">
+            <div class="chart-header">
+                <div>
+                    <div class="chart-title" id="chartTitle">תקציב המדינה</div>
+                    <div class="chart-subtitle">לחץ על פרוסה לזום, לחץ במרכז לחזור</div>
+                </div>
+                <button class="back-btn" id="backBtn">
+                    <span>→</span> חזרה
+                </button>
+            </div>
+            <div class="chart-plot" id="chartPlot"></div>
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-label">סה"כ תקציב</span>
+                    <span class="stat-value blue" id="totalBudget">--</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">מספר פריטים</span>
+                    <span class="stat-value green" id="itemCount">--</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">פריט נבחר</span>
+                    <span class="stat-value orange" id="selectedItem">הכל</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        נתונים: משרד האוצר | פותח לצורכי ניתוח תקציבי
+    </footer>
+
+    <script>
+        // ============================================
+        // DATA
+        // ============================================
+        const BUDGET_DATA = __BUDGET_DATA_PLACEHOLDER__;
+        const years = Object.keys(BUDGET_DATA).map(Number).sort();
+        const levelNames = ['תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה'];
+
+        // Color palette for categories - matching treemap style
+        const categoryColors = {
+            'בטחון וסדר ציבורי': '#008000',      // Green
+            'שירותים חברתיים': '#0064b4',        // Blue
+            'משרדי מטה': '#800080',              // Purple
+            'תשתיות': '#c86400',                 // Orange
+            'ענפי משק': '#b49600',               // Gold
+            'הוצאות אחרות': '#b40000',           // Red
+            'החזר חובות': '#505050',             // Gray
+            'רזרבות': '#008080'                  // Teal
+        };
+
+        // ============================================
+        // STATE
+        // ============================================
+        const state = {
+            theme: localStorage.getItem('budget-theme') || 'dark',
+            currentYear: years[years.length - 1],
+            maxDepth: 4,
+            currentRoot: null
+        };
+
+        // ============================================
+        // INIT
+        // ============================================
+        function init() {
+            // Populate year selector
+            const yearSelect = document.getElementById('yearSelect');
+            years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                if (year === state.currentYear) option.selected = true;
+                yearSelect.appendChild(option);
+            });
+
+            // Event listeners
+            yearSelect.addEventListener('change', e => {
+                state.currentYear = parseInt(e.target.value);
+                state.currentRoot = null;
+                updateChart();
+            });
+
+            document.getElementById('depthSelect').addEventListener('change', e => {
+                state.maxDepth = parseInt(e.target.value);
+                updateChart();
+            });
+
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+            document.getElementById('backBtn').addEventListener('click', goBack);
+
+            // Sidebar
+            document.getElementById('sidebarToggle').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.add('open');
+                document.getElementById('sidebarOverlay').classList.add('visible');
+            });
+
+            document.getElementById('sidebarClose').addEventListener('click', closeSidebar);
+            document.getElementById('sidebarOverlay').addEventListener('click', closeSidebar);
+
+            // Apply theme and render
+            applyTheme();
+            updateChart();
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('visible');
+        }
+
+        // ============================================
+        // THEME
+        // ============================================
+        function toggleTheme() {
+            state.theme = state.theme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('budget-theme', state.theme);
+            applyTheme();
+            updateChart();
+        }
+
+        function applyTheme() {
+            document.documentElement.setAttribute('data-theme', state.theme);
+            document.getElementById('themeToggle').innerHTML = state.theme === 'dark' ? '&#9790;' : '&#9788;';
+        }
+
+        // ============================================
+        // DATA PROCESSING
+        // ============================================
+        function buildSunburstData() {
+            const data = BUDGET_DATA[state.currentYear];
+            if (!data || data.length === 0) return { ids: [], labels: [], parents: [], values: [], colors: [], total: 0 };
+
+            // Build hierarchical structure - accumulate values at ALL levels
+            const nodeMap = new Map();
+
+            // Process each item - add value to ALL nodes in the path
+            data.forEach(item => {
+                const category = item.path[0]; // For coloring
+                const itemValue = item.value || 0;
+                if (itemValue <= 0) return;
+
+                // Find the deepest valid level for this item (up to maxDepth)
+                let deepestLevel = -1;
+                for (let i = 0; i < state.maxDepth && i < item.path.length; i++) {
+                    if (item.path[i]) {
+                        deepestLevel = i;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (deepestLevel < 0) return;
+
+                // Build the full path and accumulate values at ALL levels
+                let cumulativePath = 'תקציב';
+                for (let i = 0; i <= deepestLevel; i++) {
+                    const pathPart = item.path[i];
+                    const currentPath = cumulativePath + '/' + pathPart;
+
+                    if (!nodeMap.has(currentPath)) {
+                        nodeMap.set(currentPath, {
+                            id: currentPath,
+                            label: pathPart,
+                            parent: cumulativePath,
+                            value: 0,
+                            category: category
+                        });
+                    }
+
+                    // Add value to EVERY node in the path (for branchvalues='total')
+                    nodeMap.get(currentPath).value += itemValue;
+
+                    cumulativePath = currentPath;
+                }
+            });
+
+            // Calculate total
+            const total = data.reduce((sum, item) => sum + (item.value || 0), 0);
+
+            // Build output arrays
+            const ids = ['תקציב'];
+            const labels = ['תקציב המדינה'];
+            const parents = [''];
+            const values = [total]; // Root gets total
+            const colors = [''];
+
+            nodeMap.forEach(node => {
+                ids.push(node.id);
+                labels.push(node.label);
+                parents.push(node.parent);
+                values.push(node.value);
+
+                const baseColor = categoryColors[node.category] || '#6b7280';
+                colors.push(baseColor);
+            });
+
+            return { ids, labels, parents, values, colors, total };
+        }
+
+        // ============================================
+        // CHART
+        // ============================================
+        function updateChart() {
+            const isDark = state.theme === 'dark';
+            const bgColor = isDark ? '#0d1117' : '#ffffff';
+            const textColor = isDark ? '#e6edf3' : '#1f2328';
+
+            const { ids, labels, parents, values, colors } = buildSunburstData();
+
+            if (ids.length === 0) {
+                const layout = {
+                    paper_bgcolor: bgColor,
+                    font: { family: 'Heebo, sans-serif', color: textColor },
+                    annotations: [{
+                        text: 'אין נתונים להצגה',
+                        showarrow: false,
+                        font: { size: 18, color: textColor },
+                        xref: 'paper', yref: 'paper',
+                        x: 0.5, y: 0.5
+                    }]
+                };
+                Plotly.newPlot('chartPlot', [], layout, { responsive: true, displayModeBar: false });
+                return;
+            }
+
+            // Update stats
+            const total = values[0];
+            document.getElementById('totalBudget').textContent = formatBillions(total) + ' מיליארד ש"ח';
+            document.getElementById('itemCount').textContent = ids.length - 1; // Exclude root
+            document.getElementById('selectedItem').textContent = state.currentRoot ? state.currentRoot.split('/').pop() : 'הכל';
+
+            const trace = {
+                type: 'sunburst',
+                ids: ids,
+                labels: labels,
+                parents: parents,
+                values: values,
+                branchvalues: 'total',
+                marker: {
+                    colors: colors,
+                    line: { width: 1, color: isDark ? '#1a1a2e' : '#ffffff' }
+                },
+                textinfo: 'label+percent parent',
+                insidetextorientation: 'radial',
+                textfont: {
+                    family: 'Heebo, sans-serif',
+                    size: 12
+                },
+                hovertemplate: '<b>%{label}</b><br>' +
+                    'תקציב: %{value:,.0f} אלפי ש"ח<br>' +
+                    'אחוז מהאב: %{percentParent:.1%}<br>' +
+                    'אחוז מהכל: %{percentRoot:.1%}<extra></extra>',
+                maxdepth: state.maxDepth
+            };
+
+            // Set root if zoomed in
+            if (state.currentRoot) {
+                trace.level = state.currentRoot;
+            }
+
+            const chartPlot = document.getElementById('chartPlot');
+            const plotWidth = chartPlot.clientWidth || 800;
+            const plotHeight = chartPlot.clientHeight || 750;
+            const size = Math.min(plotWidth, plotHeight);
+
+            const layout = {
+                paper_bgcolor: bgColor,
+                font: { family: 'Heebo, sans-serif', color: textColor },
+                margin: { l: 0, r: 0, t: 0, b: 0 },
+                width: plotWidth,
+                height: plotHeight,
+                sunburstcolorway: Object.values(categoryColors)
+            };
+
+            Plotly.newPlot('chartPlot', [trace], layout, { responsive: true, displayModeBar: false });
+
+            // Click handler for zoom
+            document.getElementById('chartPlot').on('plotly_sunburstclick', function(eventData) {
+                if (eventData.points && eventData.points[0]) {
+                    const point = eventData.points[0];
+
+                    // If clicking on root or going back
+                    if (point.id === 'תקציב' || point.id === state.currentRoot) {
+                        goBack();
+                        return false;
+                    }
+
+                    // Zoom into clicked section
+                    state.currentRoot = point.id;
+                    document.getElementById('selectedItem').textContent = point.label;
+                    updateBackButton();
+
+                    // Let Plotly handle the zoom animation
+                }
+            });
+
+            updateBackButton();
+            updateTitle();
+        }
+
+        function goBack() {
+            if (state.currentRoot) {
+                // Go up one level
+                const parts = state.currentRoot.split('/');
+                if (parts.length > 1) {
+                    parts.pop();
+                    state.currentRoot = parts.join('/');
+                    if (state.currentRoot === 'תקציב') {
+                        state.currentRoot = null;
+                    }
+                } else {
+                    state.currentRoot = null;
+                }
+                updateChart();
+            }
+        }
+
+        function updateBackButton() {
+            const btn = document.getElementById('backBtn');
+            btn.classList.toggle('visible', state.currentRoot !== null);
+        }
+
+        function updateTitle() {
+            const title = document.getElementById('chartTitle');
+            if (state.currentRoot) {
+                const label = state.currentRoot.split('/').pop();
+                title.textContent = `תקציב: ${label}`;
+            } else {
+                title.textContent = 'תקציב המדינה';
+            }
+        }
+
+        // ============================================
+        // UTILITIES
+        // ============================================
+        function formatBillions(value) {
+            return (value / 1e6).toFixed(1);
+        }
+
+        // ============================================
+        // START
+        // ============================================
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
