@@ -296,6 +296,41 @@
             background: var(--bg-secondary);
         }
 
+        .years-filter {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .year-chip {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .year-chip:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .year-chip.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #ffffff;
+        }
+
+        .year-chip.excluded {
+            background: var(--bg-primary);
+            border-color: var(--border-color);
+            color: var(--text-secondary);
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
         /* Main Content */
         .main-content {
             padding: 30px 40px;
@@ -711,6 +746,10 @@
                     <option value="">הכל</option>
                 </select>
             </div>
+            <div class="control-group">
+                <span class="control-label">שנים להצגה</span>
+                <div class="years-filter" id="yearsFilter"></div>
+            </div>
         </div>
     </div>
 
@@ -767,15 +806,21 @@
         // ============================================
         // STATE
         // ============================================
+        const allYears = Object.keys(BUDGET_DATA).map(Number).sort();
         const state = {
             currentLevel: 0,
             selectedItems: new Set(),
             allItems: [],
             filterValue: '',
-            theme: localStorage.getItem('theme') || 'dark'
+            theme: localStorage.getItem('theme') || 'dark',
+            excludedYears: new Set()  // Years to exclude from display
         };
 
-        const years = Object.keys(BUDGET_DATA).map(Number).sort();
+        // Computed years (excluding excluded ones)
+        function getActiveYears() {
+            return allYears.filter(y => !state.excludedYears.has(y));
+        }
+        const years = allYears; // Keep for backward compatibility
         const levelNames = ['שם רמה 1', 'שם רמה 2', 'שם סעיף', 'שם תחום', 'שם תקנה', 'שם מיון רמה 1'];
         const levelLabels = ['תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה', 'סוג הוצאה'];
         const colors = ['#58a6ff', '#3fb950', '#a371f7', '#d29922', '#f85149', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16', '#f43f5e'];
@@ -807,6 +852,9 @@
             // Populate filter dropdown
             populateFilterDropdown();
 
+            // Initialize years filter
+            initYearsFilter();
+
             // Load initial data
             loadLevelData(0);
 
@@ -833,6 +881,48 @@
         function updateThemeButton() {
             document.getElementById('themeToggle').innerHTML = state.theme === 'dark' ? '&#9790;' : '&#9788;';
         }
+
+        // ============================================
+        // YEARS FILTER
+        // ============================================
+        function initYearsFilter() {
+            const container = document.getElementById('yearsFilter');
+            container.innerHTML = allYears.map(year =>
+                `<span class="year-chip active" data-year="${year}" onclick="toggleYear(${year})">${year}</span>`
+            ).join('');
+        }
+
+        function toggleYear(year) {
+            if (state.excludedYears.has(year)) {
+                state.excludedYears.delete(year);
+            } else {
+                // Don't allow excluding all years - keep at least 2
+                if (getActiveYears().length <= 2) {
+                    return;
+                }
+                state.excludedYears.add(year);
+            }
+            updateYearsFilterUI();
+            updateChart();
+            updateTable();
+        }
+
+        function updateYearsFilterUI() {
+            const chips = document.querySelectorAll('.year-chip');
+            chips.forEach(chip => {
+                const year = parseInt(chip.dataset.year);
+                if (state.excludedYears.has(year)) {
+                    chip.classList.remove('active');
+                    chip.classList.add('excluded');
+                } else {
+                    chip.classList.add('active');
+                    chip.classList.remove('excluded');
+                }
+            });
+        }
+
+        // Make toggleYear global
+        window.toggleYear = toggleYear;
 
         // ============================================
         // DATA FUNCTIONS
@@ -880,8 +970,9 @@
             return Object.values(aggregated).sort((a, b) => b.value - a.value);
         }
 
-        function getTimeSeriesForItem(itemName, levelIndex, filterValue = '') {
-            return years.map(year => {
+        function getTimeSeriesForItem(itemName, levelIndex, filterValue = '', yearsToUse = null) {
+            const targetYears = yearsToUse || getActiveYears();
+            return targetYears.map(year => {
                 const data = BUDGET_DATA[year];
                 if (!data) return 0;
 
@@ -1016,6 +1107,7 @@
                 return;
             }
 
+            const activeYears = getActiveYears();
             const traces = [];
             let colorIndex = 0;
 
@@ -1027,7 +1119,7 @@
                         ? item.parents.join(' ← ')
                         : 'תקציב המדינה';
                     traces.push({
-                        x: years,
+                        x: activeYears,
                         y: values,
                         name: item.name,
                         type: 'scatter',
@@ -1079,9 +1171,12 @@
 
         function updateTable() {
             const table = document.getElementById('dataTable');
+            const activeYears = getActiveYears();
+            const firstYear = activeYears[0];
+            const lastYear = activeYears[activeYears.length - 1];
 
-            // Header
-            const headerRow = '<tr><th>פריט</th>' + years.map(y => `<th>${y}</th>`).join('') + '<th>שינוי %</th></tr>';
+            // Header - show which years the change is calculated from
+            const headerRow = '<tr><th>פריט</th>' + activeYears.map(y => `<th>${y}</th>`).join('') + `<th>שינוי % (${firstYear}-${lastYear})</th></tr>`;
 
             // Body - only selected items
             const bodyRows = state.allItems
