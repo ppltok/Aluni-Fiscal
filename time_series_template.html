@@ -689,6 +689,39 @@
                 text-align: center;
             }
         }
+
+        /* View Toggle (Nominal / GDP) */
+        .view-toggle-container {
+            display: flex;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .view-toggle-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-toggle-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .view-toggle-btn.active {
+            background: var(--bg-secondary);
+            color: var(--accent-blue);
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
     </style>
 </head>
 <body>
@@ -767,6 +800,11 @@
                 </div>
             </div>
             <div class="header-actions">
+                <div class="view-toggle-container">
+                    <button class="view-toggle-btn active" id="btnNominal" onclick="toggleView('nominal')">₪ נומינלי</button>
+                    <button class="view-toggle-btn" id="btnGDP" onclick="toggleView('gdp')">% תוצר</button>
+                    <button class="view-toggle-btn" id="btnCapita" onclick="toggleView('per_capita')">₪ לנפש</button>
+                </div>
                 <button class="theme-toggle" id="themeToggle" title="החלף מצב תצוגה">&#9790;</button>
             </div>
         </div>
@@ -865,6 +903,34 @@
         // ============================================
         const BUDGET_DATA = __BUDGET_DATA_PLACEHOLDER__;
 
+        // GDP Data (in thousands of NIS to match budget data units)
+        const GDP_DATA = {
+            2015: 1150000000,
+            2016: 1220000000,
+            2017: 1270000000,
+            2018: 1330000000,
+            2019: 1400000000,
+            2020: 1390000000,
+            2021: 1550000000,
+            2022: 1750000000,
+            2023: 1850000000,
+            2024: 1950000000
+        };
+
+        // Population Data (in actual numbers)
+        const POPULATION_DATA = {
+            2015: 8380000,
+            2016: 8550000,
+            2017: 8710000,
+            2018: 8880000,
+            2019: 9050000,
+            2020: 9210000,
+            2021: 9360000,
+            2022: 9560000,
+            2023: 9750000,
+            2024: 9900000
+        };
+
         // ============================================
         // STATE
         // ============================================
@@ -876,7 +942,8 @@
             filterValue: '',
             theme: localStorage.getItem('theme') || 'dark',
             startYear: allYears[0],
-            endYear: allYears[allYears.length - 1]
+            endYear: allYears[allYears.length - 1],
+            viewMode: 'nominal' // 'nominal' or 'gdp'
         };
 
         // Get years within selected range
@@ -1084,7 +1151,7 @@
                     }
                 });
 
-                return total / 1e6; // Convert to billions
+                return total; // Return raw value (thousands)
             });
         }
 
@@ -1120,7 +1187,7 @@
             container.innerHTML = state.allItems.map((item, index) => {
                 const color = colors[index % colors.length];
                 const isSelected = state.selectedItems.has(item.name);
-                const valueB = (item.value / 1e6).toFixed(1);
+                const formattedVal = formatValue(item.value, allYears[allYears.length - 1]); // Use latest year for grid display
                 // Build parent path for tooltip
                 const parentPath = item.parents && item.parents.length > 0
                     ? item.parents.join(' ← ')
@@ -1134,7 +1201,7 @@
                             <span class="item-label">${item.name}</span>
                             <span class="item-path">${parentPath}</span>
                         </div>
-                        <span class="item-value">${valueB}B</span>
+                        <span class="item-value">${formattedVal}</span>
                     </label>
                 `;
             }).join('');
@@ -1208,14 +1275,29 @@
 
             state.allItems.forEach(item => {
                 if (state.selectedItems.has(item.name)) {
-                    const values = getTimeSeriesForItem(item.name, state.currentLevel, state.filterValue);
+                    const rawValues = getTimeSeriesForItem(item.name, state.currentLevel, state.filterValue);
+                    
+                    // Process values based on view mode
+                    const displayValues = rawValues.map((val, idx) => {
+                        const year = activeYears[idx];
+                        if (state.viewMode === 'gdp') {
+                            const gdp = GDP_DATA[year] || 1;
+                            return (val / gdp * 100);
+                        } else {
+                            return val / 1e6; // Convert to billions for chart
+                        }
+                    });
+
                     // Build parent path for tooltip
                     const parentPath = item.parents && item.parents.length > 0
                         ? item.parents.join(' ← ')
                         : 'תקציב המדינה';
+                        
+                    const unitLabel = state.viewMode === 'gdp' ? '% תוצר' : 'B ש"ח';
+                    
                     traces.push({
                         x: activeYears,
-                        y: values,
+                        y: displayValues,
                         name: item.name,
                         type: 'scatter',
                         mode: 'lines+markers',
@@ -1224,7 +1306,7 @@
                         hovertemplate: `<b style="font-size:16px">${item.name}</b><br>` +
                             `<span style="color:#8b949e">מסלול: ${parentPath}</span><br>` +
                             `שנה: %{x}<br>` +
-                            `תקציב: <b>%{y:.2f}B</b> ש"ח<extra></extra>`
+                            `ערך: <b>%{y:.2f} ${unitLabel}</b><extra></extra>`
                     });
                     colorIndex++;
                 }
@@ -1244,7 +1326,7 @@
                 yaxis: {
                     gridcolor: gridColor,
                     tickfont: { size: 14 },
-                    title: { text: 'מיליארדי ש"ח', font: { size: 14 } }
+                    title: { text: state.viewMode === 'gdp' ? '% תוצר' : 'מיליארדי ש"ח', font: { size: 14 } }
                 },
                 legend: {
                     orientation: 'h',
@@ -1277,16 +1359,27 @@
             const bodyRows = state.allItems
                 .filter(item => state.selectedItems.has(item.name))
                 .map(item => {
-                    const values = getTimeSeriesForItem(item.name, state.currentLevel, state.filterValue);
-                    const firstValue = values[0];
-                    const lastValue = values[values.length - 1];
-                    const changePct = firstValue > 0 ? ((lastValue - firstValue) / firstValue * 100) : 0;
+                    const rawValues = getTimeSeriesForItem(item.name, state.currentLevel, state.filterValue);
+                    
+                    // Calculate change based on raw values (always nominal change percentage)
+                    // Or should it be change in GDP %? Usually nominal change is more intuitive for "growth"
+                    // Let's stick to nominal change % for the last column, but display values according to mode
+                    
+                    const firstRaw = rawValues[0];
+                    const lastRaw = rawValues[rawValues.length - 1];
+                    const changePct = firstRaw > 0 ? ((lastRaw - firstRaw) / firstRaw * 100) : 0;
                     const isPositive = changePct >= 0;
+
+                    const displayCells = rawValues.map((val, idx) => {
+                        const year = activeYears[idx];
+                        const formatted = formatValue(val, year, true); // true = short format
+                        return `<td>${formatted}</td>`;
+                    });
 
                     return `<tr>
                         <td><strong>${item.name}</strong></td>
-                        ${values.map(v => `<td>${v.toFixed(2)}</td>`).join('')}
-                        <td class="${isPositive ? 'change-positive' : 'change-negative'}">${isPositive ? '+' : ''}${changePct.toFixed(1)}%</td>
+                        ${displayCells.join('')}
+                        <td class="${isPositive ? 'change-positive' : 'change-negative'}" dir="ltr">${isPositive ? '+' : ''}${changePct.toFixed(1)}%</td>
                     </tr>`;
                 }).join('');
 
@@ -1296,6 +1389,53 @@
 
         // Make toggleItem global
         window.toggleItem = toggleItem;
+
+        // ============================================
+        // VIEW TOGGLE
+        // ============================================
+        function toggleView(mode) {
+            if (state.viewMode === mode) return;
+            
+            state.viewMode = mode;
+            
+            // Update buttons
+            document.getElementById('btnNominal').classList.toggle('active', mode === 'nominal');
+            document.getElementById('btnGDP').classList.toggle('active', mode === 'gdp');
+            document.getElementById('btnCapita').classList.toggle('active', mode === 'per_capita');
+            
+            // Refresh view
+            renderItemsGrid();
+            updateChart();
+            updateTable();
+        }
+
+        function formatValue(value, year, short = false) {
+            if (state.viewMode === 'gdp') {
+                const gdp = GDP_DATA[year] || 1;
+                const pct = (value / gdp * 100).toFixed(2);
+                return pct + '%';
+            } else if (state.viewMode === 'per_capita') {
+                const pop = POPULATION_DATA[year] || 1;
+                const perCapita = (value * 1000) / pop;
+                return perCapita.toLocaleString('he-IL', { maximumFractionDigits: 0 });
+            } else {
+                // Nominal
+                if (short) {
+                    // For table/grid
+                    if (value >= 1e6) return (value / 1e6).toFixed(2) + 'B';
+                    if (value >= 1e3) return (value / 1e3).toFixed(1) + 'M';
+                    return (value / 1e3).toFixed(1) + 'k';
+                }
+                
+                if (value >= 1e6) {
+                    return (value / 1e6).toFixed(1) + 'B';
+                } else if (value >= 1e3) {
+                    return (value / 1e3).toFixed(1) + 'M';
+                } else {
+                    return value.toLocaleString() + 'k';
+                }
+            }
+        }
 
         // ============================================
         // START

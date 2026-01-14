@@ -695,6 +695,40 @@
             background: rgba(88, 166, 255, 0.1);
         }
 
+        /* View Toggle (Nominal / GDP) */
+        .view-toggle-container {
+            display: flex;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+            margin-right: 20px;
+        }
+
+        .view-toggle-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-toggle-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .view-toggle-btn.active {
+            background: var(--bg-secondary);
+            color: var(--accent-blue);
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
         /* ============================================ */
         /* MOBILE RESPONSIVE STYLES */
         /* ============================================ */
@@ -1042,6 +1076,12 @@
                 </select>
             </div>
 
+            <div class="view-toggle-container">
+                <button class="view-toggle-btn active" id="btnNominal" onclick="toggleView('nominal')">₪ נומינלי</button>
+                <button class="view-toggle-btn" id="btnGDP" onclick="toggleView('gdp')">% תוצר</button>
+                <button class="view-toggle-btn" id="btnCapita" onclick="toggleView('per_capita')">₪ לנפש</button>
+            </div>
+
             <button class="theme-toggle" id="themeToggle" title="החלף מצב תצוגה">&#9790;</button>
         </div>
     </header>
@@ -1170,6 +1210,35 @@
         // ============================================
         const BUDGET_DATA = __BUDGET_DATA_PLACEHOLDER__;
 
+        // GDP Data (in thousands of NIS to match budget data units)
+        // 1 Billion NIS = 1,000,000 thousands
+        const GDP_DATA = {
+            2015: 1150000000,
+            2016: 1220000000,
+            2017: 1270000000,
+            2018: 1330000000,
+            2019: 1400000000,
+            2020: 1390000000,
+            2021: 1550000000,
+            2022: 1750000000,
+            2023: 1850000000,
+            2024: 1950000000
+        };
+
+        // Population Data (in actual numbers)
+        const POPULATION_DATA = {
+            2015: 8380000,
+            2016: 8550000,
+            2017: 8710000,
+            2018: 8880000,
+            2019: 9050000,
+            2020: 9210000,
+            2021: 9360000,
+            2022: 9560000,
+            2023: 9750000,
+            2024: 9900000
+        };
+
         // ============================================
         // STATE MANAGEMENT
         // ============================================
@@ -1179,7 +1248,8 @@
             currentData: null,
             hierarchy: ['שם רמה 1', 'שם רמה 2', 'שם סעיף', 'שם תחום', 'שם תקנה', 'שם מיון רמה 1'],
             levelNames: ['תקציב המדינה', 'תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה', 'סוג הוצאה'],
-            flatViewLevel: null  // When set, shows ALL items at this level across entire budget
+            flatViewLevel: null,  // When set, shows ALL items at this level across entire budget
+            viewMode: 'nominal'   // 'nominal' or 'gdp'
         };
 
         // ============================================
@@ -1363,7 +1433,7 @@
 
             // Total budget at current level
             const total = filteredData.reduce((sum, item) => sum + item.value, 0);
-            document.getElementById('totalBudget').textContent = formatBillions(total) + ' מיליארד';
+            document.getElementById('totalBudget').textContent = formatValue(total);
 
             // Top category at current level - aggregate by the level index
             const aggregated = {};
@@ -1452,7 +1522,13 @@
             // Root values
             values.push(total);
             colors.push('rgba(0,0,0,0)');
-            customdata.push({ pct: 100, billions: formatBillions(total), fullNumber: total.toLocaleString('he-IL'), level: -1 });
+            customdata.push({
+                pct: 100,
+                billions: formatBillions(total),
+                formattedValue: formatValue(total),
+                fullNumber: total.toLocaleString('he-IL'),
+                level: -1
+            });
 
             // Get parent category for drill-down coloring
             let parentCategory = path.length > 0 ? path[0] : null;
@@ -1527,7 +1603,7 @@
             level1Data.forEach((item, idx) => {
                 const id = `L1_${idx}`;
                 const pct = (item.value / total * 100);
-                const billions = formatBillions(item.value);
+                const formattedVal = formatValue(item.value);
                 const salaryPct = item.value > 0 ? (item.salaryValue / item.value * 100) : 0;
                 const hasSalary = salaryPct > 0;
 
@@ -1538,7 +1614,7 @@
                 colors.push(getItemColor(item.name, item.value, true, item));
                 customdata.push({
                     pct: pct.toFixed(1),
-                    billions,
+                    formattedValue: formattedVal,
                     fullNumber: item.value.toLocaleString('he-IL'),
                     level: 1,
                     hasChildren: hasNextLevel && item.rawItems.some(ri => ri.path[nextLevelIndex]),
@@ -1553,20 +1629,10 @@
 
                 if (pct >= 15) {
                     // Very large boxes - extra large text with full info
-                    if (isLevel1Deepest) {
-                        const fullNum = item.value.toLocaleString('he-IL', {maximumFractionDigits: 0});
-                        textArray.push(`<b style="font-size:1.6em">${item.name}</b><br><span style="font-size:1.3em">${pct.toFixed(1)}%</span><br>${fullNum} אלפי ש"ח${salaryIndicator}`);
-                    } else {
-                        textArray.push(`<b style="font-size:1.6em">${item.name}</b><br><span style="font-size:1.3em">${pct.toFixed(1)}%</span><br>${billions}B${salaryIndicator}`);
-                    }
+                    textArray.push(`<b style="font-size:1.6em">${item.name}</b><br><span style="font-size:1.3em">${pct.toFixed(1)}%</span><br>${formattedVal}${salaryIndicator}`);
                 } else if (pct >= 8) {
                     // Large boxes - full info with salary indicator
-                    if (isLevel1Deepest) {
-                        const fullNum = item.value.toLocaleString('he-IL', {maximumFractionDigits: 0});
-                        textArray.push(`<b style="font-size:1.3em">${item.name}</b><br>${pct.toFixed(1)}%<br>${fullNum} אלפי ש"ח${salaryIndicator}`);
-                    } else {
-                        textArray.push(`<b style="font-size:1.3em">${item.name}</b><br>${pct.toFixed(1)}%<br>${billions}B${salaryIndicator}`);
-                    }
+                    textArray.push(`<b style="font-size:1.3em">${item.name}</b><br>${pct.toFixed(1)}%<br>${formattedVal}${salaryIndicator}`);
                 } else if (pct >= 3) {
                     // Medium boxes - name, percentage and salary
                     textArray.push(`<b>${item.name}</b><br>${pct.toFixed(1)}%${salaryIndicator}`);
@@ -1584,9 +1650,7 @@
             // No level 2 - we show only one level at a time with maxdepth: 1
 
             // Dynamic hover template based on depth - with salary info
-            const hoverTpl = isLevel1Deepest
-                ? '<b>%{label}</b><br>סכום: %{customdata.fullNumber} אלפי ש"ח<br>אחוז: %{customdata.pct}%<br>שכר: %{customdata.salaryPct}%<extra></extra>'
-                : '<b>%{label}</b><br>סכום: %{customdata.billions} מיליארד ש"ח<br>אחוז: %{customdata.pct}%<br>שכר: %{customdata.salaryPct}%<extra></extra>';
+            const hoverTpl = '<b>%{label}</b><br>גודל: %{customdata.formattedValue}<br>חלק יחסי: %{customdata.pct}%<br>שכר: %{customdata.salaryPct}%<extra></extra>';
 
             const trace = {
                 type: 'treemap',
@@ -1833,7 +1897,7 @@
             });
 
             // Add salary legend explanation with total
-            const totalSalaryBillions = formatBillions(totalSalary);
+            const totalSalaryFormatted = formatValue(totalSalary);
             const totalSalaryPct = total > 0 ? (totalSalary / total * 100).toFixed(1) : 0;
             const salaryLegendDiv = document.createElement('div');
             salaryLegendDiv.className = 'salary-legend';
@@ -1843,10 +1907,28 @@
                     <span>אחוז שכר מתוך ההוצאה (מוצג כאשר >= 5%)</span>
                 </div>
                 <div class="salary-legend-total">
-                    סה"כ שכר ברמה זו: ${totalSalaryBillions} מיליארד ש"ח (${totalSalaryPct}%)
+                    סה"כ שכר ברמה זו: ${totalSalaryFormatted} (${totalSalaryPct}%)
                 </div>
             `;
             container.appendChild(salaryLegendDiv);
+        }
+
+        // ============================================
+        // VIEW TOGGLE
+        // ============================================
+        function toggleView(mode) {
+            if (state.viewMode === mode) return;
+            
+            state.viewMode = mode;
+            
+            // Update buttons
+            document.getElementById('btnNominal').classList.toggle('active', mode === 'nominal');
+            document.getElementById('btnGDP').classList.toggle('active', mode === 'gdp');
+            document.getElementById('btnCapita').classList.toggle('active', mode === 'per_capita');
+            
+            // Refresh view
+            updateStats(state.currentData);
+            renderTreemap(state.currentData, state.currentPath);
         }
 
         // ============================================
@@ -1854,6 +1936,28 @@
         // ============================================
         function formatBillions(value) {
             return (value / 1e6).toFixed(1);
+        }
+
+        function formatValue(value) {
+            if (state.viewMode === 'gdp') {
+                const gdp = GDP_DATA[state.currentYear] || 1;
+                const pct = (value / gdp * 100).toFixed(2);
+                return pct + '% תוצר';
+            } else if (state.viewMode === 'per_capita') {
+                const pop = POPULATION_DATA[state.currentYear] || 1;
+                // value is in thousands, so multiply by 1000 to get actual NIS
+                const perCapita = (value * 1000) / pop;
+                return perCapita.toLocaleString('he-IL', { maximumFractionDigits: 0 }) + ' ₪ לנפש';
+            } else {
+                // Nominal
+                if (value >= 1e6) {
+                    return (value / 1e6).toFixed(1) + ' מיליארד';
+                } else if (value >= 1e3) {
+                    return (value / 1e3).toFixed(1) + ' מיליון';
+                } else {
+                    return value.toLocaleString() + ' אלף';
+                }
+            }
         }
 
         // ============================================

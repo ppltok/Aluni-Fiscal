@@ -381,6 +381,39 @@
             .control-group { width: 100%; }
             .control-select { flex: 1; }
         }
+
+        /* View Toggle (Nominal / GDP) */
+        .view-toggle-container {
+            display: flex;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .view-toggle-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-toggle-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .view-toggle-btn.active {
+            background: var(--bg-secondary);
+            color: var(--accent-blue);
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
     </style>
 </head>
 <body>
@@ -466,6 +499,11 @@
                     <span class="control-label">שנה:</span>
                     <select class="control-select" id="yearSelect"></select>
                 </div>
+                <div class="view-toggle-container">
+                    <button class="view-toggle-btn active" id="btnNominal" onclick="toggleView('nominal')">₪ נומינלי</button>
+                    <button class="view-toggle-btn" id="btnGDP" onclick="toggleView('gdp')">% תוצר</button>
+                    <button class="view-toggle-btn" id="btnCapita" onclick="toggleView('per_capita')">₪ לנפש</button>
+                </div>
                 <button class="theme-toggle" id="themeToggle" title="החלף מצב תצוגה">&#9790;</button>
             </div>
         </div>
@@ -516,6 +554,34 @@
         const years = Object.keys(BUDGET_DATA).map(Number).sort();
         const levelNames = ['תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה'];
 
+        // GDP Data (in thousands of NIS to match budget data units)
+        const GDP_DATA = {
+            2015: 1150000000,
+            2016: 1220000000,
+            2017: 1270000000,
+            2018: 1330000000,
+            2019: 1400000000,
+            2020: 1390000000,
+            2021: 1550000000,
+            2022: 1750000000,
+            2023: 1850000000,
+            2024: 1950000000
+        };
+
+        // Population Data (in actual numbers)
+        const POPULATION_DATA = {
+            2015: 8380000,
+            2016: 8550000,
+            2017: 8710000,
+            2018: 8880000,
+            2019: 9050000,
+            2020: 9210000,
+            2021: 9360000,
+            2022: 9560000,
+            2023: 9750000,
+            2024: 9900000
+        };
+
         // Color palette for categories - matching treemap style
         const categoryColors = {
             'בטחון וסדר ציבורי': '#008000',      // Green
@@ -535,7 +601,8 @@
             theme: localStorage.getItem('budget-theme') || 'dark',
             currentYear: years[years.length - 1],
             maxDepth: 4,
-            currentRoot: null
+            currentRoot: null,
+            viewMode: 'nominal' // 'nominal' or 'gdp'
         };
 
         // ============================================
@@ -599,6 +666,22 @@
         function applyTheme() {
             document.documentElement.setAttribute('data-theme', state.theme);
             document.getElementById('themeToggle').innerHTML = state.theme === 'dark' ? '&#9790;' : '&#9788;';
+        }
+
+        // ============================================
+        // VIEW TOGGLE
+        // ============================================
+        function toggleView(mode) {
+            if (state.viewMode === mode) return;
+            
+            state.viewMode = mode;
+            
+            // Update buttons
+            document.getElementById('btnNominal').classList.toggle('active', mode === 'nominal');
+            document.getElementById('btnGDP').classList.toggle('active', mode === 'gdp');
+            
+            // Refresh view
+            updateChart();
         }
 
         // ============================================
@@ -703,9 +786,20 @@
 
             // Update stats
             const total = values[0];
-            document.getElementById('totalBudget').textContent = formatBillions(total) + ' מיליארד ש"ח';
+            document.getElementById('totalBudget').textContent = formatValue(total);
             document.getElementById('itemCount').textContent = ids.length - 1; // Exclude root
             document.getElementById('selectedItem').textContent = state.currentRoot ? state.currentRoot.split('/').pop() : 'הכל';
+
+            const unitLabel = state.viewMode === 'gdp' ? '% תוצר' : (state.viewMode === 'per_capita' ? '₪ לנפש' : 'אלפי ש"ח');
+
+            // If GDP mode, we need to adjust values for display?
+            // Sunburst values must be proportional, so we can keep raw values for the chart sizing
+            // but update the hovertemplate to show the formatted value.
+            // However, Plotly sunburst uses 'values' for sizing. If we change values to %, the proportions remain the same.
+            // But 'total' branchvalues logic might get tricky if we convert everything to %.
+            // It's safer to keep raw values for the chart logic and use customdata for display.
+
+            const customdata = values.map(v => formatValue(v));
 
             const trace = {
                 type: 'sunburst',
@@ -725,9 +819,10 @@
                     size: 12
                 },
                 hovertemplate: '<b>%{label}</b><br>' +
-                    'תקציב: %{value:,.0f} אלפי ש"ח<br>' +
+                    `גודל: %{customdata}<br>` +
                     'אחוז מהאב: %{percentParent:.1%}<br>' +
                     'אחוז מהכל: %{percentRoot:.1%}<extra></extra>',
+                customdata: customdata,
                 maxdepth: state.maxDepth
             };
 
@@ -813,6 +908,23 @@
         // ============================================
         function formatBillions(value) {
             return (value / 1e6).toFixed(1);
+        }
+
+        function formatValue(value) {
+            if (state.viewMode === 'gdp') {
+                const gdp = GDP_DATA[state.currentYear] || 1;
+                const pct = (value / gdp * 100).toFixed(2);
+                return pct + '% תוצר';
+            } else {
+                // Nominal
+                if (value >= 1e6) {
+                    return (value / 1e6).toFixed(1) + ' מיליארד ש"ח';
+                } else if (value >= 1e3) {
+                    return (value / 1e3).toFixed(1) + ' מיליון ש"ח';
+                } else {
+                    return value.toLocaleString() + ' אלף ש"ח';
+                }
+            }
         }
 
         // ============================================

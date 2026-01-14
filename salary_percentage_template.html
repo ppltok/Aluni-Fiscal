@@ -330,6 +330,39 @@
             .control-group { width: 100%; }
             .control-select { flex: 1; }
         }
+
+        /* View Toggle (Nominal / GDP) */
+        .view-toggle-container {
+            display: flex;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px;
+            gap: 4px;
+        }
+
+        .view-toggle-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .view-toggle-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .view-toggle-btn.active {
+            background: var(--bg-secondary);
+            color: var(--accent-blue);
+            font-weight: 500;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
     </style>
 </head>
 <body>
@@ -414,6 +447,11 @@
                     <span class="control-label">שנה:</span>
                     <select class="control-select" id="yearSelect"></select>
                 </div>
+                <div class="view-toggle-container">
+                    <button class="view-toggle-btn active" id="btnNominal" onclick="toggleView('nominal')">₪ נומינלי</button>
+                    <button class="view-toggle-btn" id="btnGDP" onclick="toggleView('gdp')">% תוצר</button>
+                    <button class="view-toggle-btn" id="btnCapita" onclick="toggleView('per_capita')">₪ לנפש</button>
+                </div>
                 <button class="theme-toggle" id="themeToggle" title="החלף מצב תצוגה">&#9790;</button>
             </div>
         </div>
@@ -461,13 +499,42 @@
         const years = Object.keys(BUDGET_DATA).map(Number).sort();
         const levelNames = ['תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה'];
 
+        // GDP Data (in thousands of NIS to match budget data units)
+        const GDP_DATA = {
+            2015: 1150000000,
+            2016: 1220000000,
+            2017: 1270000000,
+            2018: 1330000000,
+            2019: 1400000000,
+            2020: 1390000000,
+            2021: 1550000000,
+            2022: 1750000000,
+            2023: 1850000000,
+            2024: 1950000000
+        };
+
+        // Population Data (in actual numbers)
+        const POPULATION_DATA = {
+            2015: 8380000,
+            2016: 8550000,
+            2017: 8710000,
+            2018: 8880000,
+            2019: 9050000,
+            2020: 9210000,
+            2021: 9360000,
+            2022: 9560000,
+            2023: 9750000,
+            2024: 9900000
+        };
+
         // ============================================
         // STATE
         // ============================================
         const state = {
             theme: localStorage.getItem('budget-theme') || 'dark',
             currentYear: years[years.length - 1],
-            currentLevel: 2
+            currentLevel: 2,
+            viewMode: 'nominal' // 'nominal' or 'gdp'
         };
 
         // ============================================
@@ -532,6 +599,22 @@
         }
 
         // ============================================
+        // VIEW TOGGLE
+        // ============================================
+        function toggleView(mode) {
+            if (state.viewMode === mode) return;
+            
+            state.viewMode = mode;
+            
+            // Update buttons
+            document.getElementById('btnNominal').classList.toggle('active', mode === 'nominal');
+            document.getElementById('btnGDP').classList.toggle('active', mode === 'gdp');
+            
+            // Refresh view
+            updateChart();
+        }
+
+        // ============================================
         // DATA PROCESSING
         // ============================================
         function calculateSalaryPercentage(levelIndex) {
@@ -582,9 +665,20 @@
             // Sort by total budget for display
             data.sort((a, b) => b.total - a.total);
 
-            // Calculate non-salary amounts
-            const salaryAmounts = data.map(d => d.salary / 1e6);
-            const otherAmounts = data.map(d => (d.total - d.salary) / 1e6);
+            // Calculate amounts based on view mode
+            const gdp = GDP_DATA[state.currentYear] || 1;
+            
+            const salaryAmounts = data.map(d => {
+                if (state.viewMode === 'gdp') return (d.salary / gdp * 100);
+                return d.salary / 1e6;
+            });
+            
+            const otherAmounts = data.map(d => {
+                if (state.viewMode === 'gdp') return ((d.total - d.salary) / gdp * 100);
+                return (d.total - d.salary) / 1e6;
+            });
+
+            const unitLabel = state.viewMode === 'gdp' ? '% תוצר' : 'B ש"ח';
 
             // Salary trace (colored by percentage)
             const traceSalary = {
@@ -604,7 +698,7 @@
                 textposition: 'inside',
                 textfont: { color: '#ffffff', size: 11 },
                 hovertemplate: '<b>%{y}</b><br>' +
-                    'שכר: %{x:.2f}B ש"ח<br>' +
+                    `שכר: %{x:.2f} ${unitLabel}<br>` +
                     'אחוז שכר: %{customdata:.1f}%<extra></extra>',
                 customdata: data.map(d => d.salaryPct)
             };
@@ -621,7 +715,7 @@
                 textposition: 'inside',
                 textfont: { color: textColor, size: 11 },
                 hovertemplate: '<b>%{y}</b><br>' +
-                    'הוצאות אחרות: %{x:.2f}B ש"ח<br>' +
+                    `הוצאות אחרות: %{x:.2f} ${unitLabel}<br>` +
                     'אחוז: %{customdata:.1f}%<extra></extra>',
                 customdata: data.map(d => 100 - d.salaryPct)
             };
@@ -633,7 +727,10 @@
                 font: { family: 'Heebo, sans-serif', color: textColor, size: 13 },
                 margin: { l: 200, r: 80, t: 20, b: 60 },
                 xaxis: {
-                    title: { text: 'מיליארדי ש"ח', font: { size: 14 } },
+                    title: {
+                        text: state.viewMode === 'gdp' ? '% תוצר' : (state.viewMode === 'per_capita' ? 'ש"ח לנפש' : 'מיליארדי ש"ח'),
+                        font: { size: 14 }
+                    },
                     gridcolor: gridColor
                 },
                 yaxis: {
