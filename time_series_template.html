@@ -1283,6 +1283,9 @@
                         if (state.viewMode === 'gdp') {
                             const gdp = GDP_DATA[year] || 1;
                             return (val / gdp * 100);
+                        } else if (state.viewMode === 'per_capita') {
+                            const pop = POPULATION_DATA[year] || 1;
+                            return (val * 1000) / pop; // Actual NIS per person
                         } else {
                             return val / 1e6; // Convert to billions for chart
                         }
@@ -1293,7 +1296,9 @@
                         ? item.parents.join(' ← ')
                         : 'תקציב המדינה';
                         
-                    const unitLabel = state.viewMode === 'gdp' ? '% תוצר' : 'B ש"ח';
+                    let unitLabel = 'B ש"ח';
+                    if (state.viewMode === 'gdp') unitLabel = '% תוצר';
+                    if (state.viewMode === 'per_capita') unitLabel = '₪ לנפש';
                     
                     traces.push({
                         x: activeYears,
@@ -1326,7 +1331,10 @@
                 yaxis: {
                     gridcolor: gridColor,
                     tickfont: { size: 14 },
-                    title: { text: state.viewMode === 'gdp' ? '% תוצר' : 'מיליארדי ש"ח', font: { size: 14 } }
+                    title: {
+                        text: state.viewMode === 'gdp' ? '% תוצר' : (state.viewMode === 'per_capita' ? 'ש"ח לנפש' : 'מיליארדי ש"ח'),
+                        font: { size: 14 }
+                    }
                 },
                 legend: {
                     orientation: 'h',
