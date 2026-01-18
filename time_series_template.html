@@ -1309,7 +1309,7 @@
                         line: { color: colors[colorIndex % colors.length], width: 3 },
                         marker: { size: 8 },
                         hovertemplate: `<b style="font-size:16px">${item.name}</b><br>` +
-                            `<span style="color:#8b949e">מסלול: ${parentPath}</span><br>` +
+                            `<span style="color:#a5d6ff">מסלול: ${parentPath}</span><br>` +
                             `שנה: %{x}<br>` +
                             `ערך: <b>%{y:.2f} ${unitLabel}</b><extra></extra>`
                     });
@@ -1344,7 +1344,7 @@
                     x: 1,
                     font: { size: 13 }
                 },
-                hovermode: 'x unified',
+                hovermode: 'closest',
                 hoverlabel: {
                     font: { size: 14 }
                 }
