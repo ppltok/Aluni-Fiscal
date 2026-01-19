@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5 עמודי התקציב | ויזואליזציה</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+            --accent-pink: #db61a2;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --bg-tertiary: #f0f2f5;
+            --border-color: #d0d7de;
+            --text-primary: #1f2328;
+            --text-secondary: #656d76;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            right: 0;
+            top: 0;
+            height: 100vh;
+            width: 60px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 1000;
+            transition: width 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.expanded { width: 280px; }
+
+        .sidebar-toggle {
+            width: 100%;
+            padding: 20px;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 20px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-nav { padding: 10px 0; flex: 1; overflow-y: auto; }
+
+        .sidebar-nav-item { list-style: none; }
+
+        .sidebar-nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s;
+            gap: 15px;
+        }
+
+        .sidebar-nav-link:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .sidebar-nav-link.active {
+            color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .sidebar-nav-icon { font-size: 20px; min-width: 24px; text-align: center; }
+
+        .sidebar-nav-text { display: none; }
+        .sidebar.expanded .sidebar-nav-text { display: block; }
+
+        .sidebar-nav-label { font-size: 14px; font-weight: 500; }
+        .sidebar-nav-desc { font-size: 11px; color: var(--text-secondary); }
+
+        /* Main content */
+        .main-content {
+            margin-right: 60px;
+            padding: 30px;
+            transition: margin-right 0.3s ease;
+        }
+
+        body.sidebar-expanded .main-content { margin-right: 280px; }
+
+        /* Header */
+        .page-header {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .page-subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .year-select {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .theme-toggle {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        /* Stats cards */
+        .stats-row {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .stat-value.blue { color: var(--accent-blue); }
+        .stat-value.green { color: var(--accent-green); }
+        .stat-value.red { color: var(--accent-red); }
+        .stat-value.orange { color: var(--accent-orange); }
+
+        /* Chart container */
+        .chart-section {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chart-container {
+            height: 500px;
+        }
+
+        /* Pillars legend */
+        .pillars-legend {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .pillar-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s;
+        }
+
+        .pillar-card:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .pillar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .pillar-name {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pillar-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .pillar-value {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .pillar-items {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .pillar-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .pillar-item:last-child { border-bottom: none; }
+
+        /* Other section */
+        .other-section {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .other-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--accent-red);
+        }
+
+        .other-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .other-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .other-item-value {
+            font-weight: 500;
+            color: var(--accent-red);
+        }
+
+        /* Chart controls */
+        .chart-controls {
+            margin-right: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .chart-controls label {
+            font-weight: 500;
+        }
+
+        .chart-controls input[type="range"] {
+            width: 120px;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .chart-controls input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .zoom-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .zoom-btn:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        /* View Toggle */
+        .view-toggle {
+            display: flex;
+            gap: 0;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 4px;
+            margin-left: 20px;
+        }
+
+        .view-toggle-btn {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .view-toggle-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .view-toggle-btn.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        /* Whale Hunter Section */
+        .whale-section {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(88, 166, 255, 0.05) 100%);
+            border: 2px solid var(--accent-blue);
+            border-radius: 16px;
+            padding: 30px;
+        }
+
+        .whale-header {
+            margin-bottom: 25px;
+        }
+
+        .whale-title {
+            font-size: 22px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--accent-blue);
+        }
+
+        .whale-title span {
+            font-size: 28px;
+        }
+
+        .whale-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            margin-right: 42px;
+        }
+
+        .whale-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .whale-stat {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .whale-stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .whale-stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .whale-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .whale-item {
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            padding: 18px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .whale-item:hover {
+            border-color: var(--accent-blue);
+            transform: translateX(-5px);
+        }
+
+        .whale-item-info {
+            flex: 1;
+        }
+
+        .whale-item-name {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .whale-item-path {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .whale-item-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            min-width: 100px;
+            text-align: left;
+        }
+
+        .whale-item-rank {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            color: var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            margin-left: 15px;
+        }
+
+        .whale-item-details {
+            display: none;
+            padding-top: 15px;
+            margin-top: 15px;
+            border-top: 1px solid var(--border-color);
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .whale-item.expanded .whale-item-details {
+            display: block;
+        }
+
+        /* Colors for pillars */
+        .pillar-security .pillar-icon { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
+        .pillar-security .pillar-value { color: var(--accent-red); }
+
+        .pillar-health .pillar-icon { background: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
+        .pillar-health .pillar-value { color: var(--accent-green); }
+
+        .pillar-infrastructure .pillar-icon { background: rgba(210, 153, 34, 0.2); color: var(--accent-orange); }
+        .pillar-infrastructure .pillar-value { color: var(--accent-orange); }
+
+        .pillar-transport .pillar-icon { background: rgba(163, 113, 247, 0.2); color: var(--accent-purple); }
+        .pillar-transport .pillar-value { color: var(--accent-purple); }
+
+        .pillar-education .pillar-icon { background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+        .pillar-education .pillar-value { color: var(--accent-blue); }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebarToggle" title="הרחב/כווץ תפריט">&#9776;</button>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item">
+                <a href="budget_interactive.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9641;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">תקציב המדינה</div>
+                        <div class="sidebar-nav-desc">תצוגה היררכית</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="time_series.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#128200;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">השוואה שנתית</div>
+                        <div class="sidebar-nav-desc">מגמות לאורך זמן</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="salary_percentage.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#8362;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">אחוזי שכר</div>
+                        <div class="sidebar-nav-desc">גמישות תקציבית</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="ministry_overview.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9962;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">סקירת משרדים</div>
+                        <div class="sidebar-nav-desc">השוואה בין משרדים</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="sunburst_budget.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9788;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">Sunburst</div>
+                        <div class="sidebar-nav-desc">תרשים שמש היררכי</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="five_pillars.html" class="sidebar-nav-link active">
+                    <span class="sidebar-nav-icon">&#9733;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">5 עמודי התקציב</div>
+                        <div class="sidebar-nav-desc">ניתוח הוצאות ליבה</div>
+                    </div>
+                </a>
+            </li>
+        </ul>
+    </aside>
+
+    <div class="main-content">
+        <!-- Header -->
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">5 עמודי התקציב</h1>
+                <p class="page-subtitle">ביטחון, בריאות, תשתיות, תחבורה וחינוך - מה באמת נחוץ?</p>
+            </div>
+            <div class="controls">
+                <select class="year-select" id="yearSelect"></select>
+                <button class="theme-toggle" id="themeToggle" title="החלף מצב תצוגה">&#9790;</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-label">סה"כ תקציב</div>
+                <div class="stat-value blue" id="totalBudget">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">5 עמודים</div>
+                <div class="stat-value green" id="pillarsTotal">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">אחר</div>
+                <div class="stat-value red" id="otherTotal">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">אחוז "אחר"</div>
+                <div class="stat-value orange" id="otherPercent">--</div>
+            </div>
+        </div>
+
+        <!-- Sankey Chart -->
+        <div class="chart-section">
+            <div class="chart-title">
+                <span>&#128202;</span>
+                זרימת התקציב - מהיכן לאן?
+                <div class="view-toggle">
+                    <button class="view-toggle-btn active" id="viewAll" onclick="setView('all')">תמונה מלאה</button>
+                    <button class="view-toggle-btn" id="viewOther" onclick="setView('other')">רק "אחר"</button>
+                </div>
+                <div class="chart-controls">
+                    <label>גודל תרשים:</label>
+                    <input type="range" id="chartZoom" min="400" max="1200" value="600" step="100">
+                    <button class="zoom-btn" onclick="adjustZoom(-100)">-</button>
+                    <button class="zoom-btn" onclick="adjustZoom(100)">+</button>
+                </div>
+            </div>
+            <div class="chart-container" id="sankeyChart" style="height: 600px; overflow: auto;"></div>
+        </div>
+
+        <!-- Whale Hunter Section -->
+        <div class="whale-section">
+            <div class="whale-header">
+                <div class="whale-title">
+                    <span>&#128011;</span>
+                    צייד הלווייתנים - הוצאות גדולות שאינן ליבה
+                </div>
+                <div class="whale-subtitle">הוצאות מעל 1 מיליארד ש"ח שאינן ב-5 העמודים</div>
+            </div>
+            <div class="whale-stats">
+                <div class="whale-stat">
+                    <div class="whale-stat-value" id="whaleCount">--</div>
+                    <div class="whale-stat-label">לווייתנים</div>
+                </div>
+                <div class="whale-stat">
+                    <div class="whale-stat-value" id="whaleTotal">--</div>
+                    <div class="whale-stat-label">סה"כ</div>
+                </div>
+                <div class="whale-stat">
+                    <div class="whale-stat-value" id="whalePotential">--</div>
+                    <div class="whale-stat-label">פוטנציאל חיסכון</div>
+                </div>
+            </div>
+            <div class="whale-list" id="whaleList"></div>
+        </div>
+
+        <!-- Pillars breakdown -->
+        <div class="pillars-legend" id="pillarsLegend"></div>
+
+        <!-- Other items -->
+        <div class="other-section">
+            <div class="other-title">&#10060; כל ההוצאות שאינן ב-5 העמודים</div>
+            <div class="other-grid" id="otherGrid"></div>
+        </div>
+    </div>
+
+    <script>
+        // Data placeholder
+        const BUDGET_DATA = __BUDGET_DATA_PLACEHOLDER__;
+
+        // Pillar definitions
+        const PILLARS = {
+            security: {
+                name: 'ביטחון',
+                icon: '&#128737;',
+                color: '#f85149',
+                match: (item) => item.path[0] === 'בטחון וסדר ציבורי'
+            },
+            health: {
+                name: 'בריאות',
+                icon: '&#128153;',
+                color: '#3fb950',
+                match: (item) => item.path[0] === 'שירותים חברתיים' && item.path[1] === 'בריאות'
+            },
+            infrastructure: {
+                name: 'תשתיות',
+                icon: '&#127959;',
+                color: '#d29922',
+                match: (item) => item.path[0] === 'תשתיות' &&
+                    ['בינוי ושיכון', 'משק המים', 'אנרגיה'].includes(item.path[1])
+            },
+            transport: {
+                name: 'תחבורה',
+                icon: '&#128652;',
+                color: '#a371f7',
+                match: (item) => item.path[0] === 'תשתיות' && item.path[1] === 'תחבורה'
+            },
+            education: {
+                name: 'חינוך',
+                icon: '&#127891;',
+                color: '#58a6ff',
+                match: (item) => item.path[0] === 'שירותים חברתיים' &&
+                    ['חינוך', 'השכלה גבוהה'].includes(item.path[1])
+            }
+        };
+
+        const state = {
+            currentYear: 2024,
+            chartHeight: 600,
+            viewMode: 'all' // 'all' or 'other'
+        };
+
+        // Whale threshold (1 billion shekel = 1,000,000 thousands)
+        const WHALE_THRESHOLD = 1000000;
+
+        // Set view mode function
+        function setView(mode) {
+            state.viewMode = mode;
+            document.getElementById('viewAll').classList.toggle('active', mode === 'all');
+            document.getElementById('viewOther').classList.toggle('active', mode === 'other');
+            const data = BUDGET_DATA[state.currentYear];
+            if (data) {
+                const categorized = categorizeItems(data);
+                drawSankey(categorized);
+            }
+        }
+
+        // Zoom adjustment function
+        function adjustZoom(delta) {
+            const slider = document.getElementById('chartZoom');
+            const current = parseInt(slider.value);
+            const newValue = Math.min(1200, Math.max(400, current + delta));
+            slider.value = newValue;
+            state.chartHeight = newValue;
+            updateChartHeight();
+        }
+
+        function updateChartHeight() {
+            const container = document.getElementById('sankeyChart');
+            container.style.height = state.chartHeight + 'px';
+            // Redraw with new height
+            const data = BUDGET_DATA[state.currentYear];
+            if (data) {
+                const categorized = categorizeItems(data);
+                drawSankey(categorized);
+            }
+        }
+
+        // Initialize
+        function init() {
+            // Populate year select
+            const yearSelect = document.getElementById('yearSelect');
+            const years = Object.keys(BUDGET_DATA).map(Number).sort((a, b) => b - a);
+            years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
+            yearSelect.addEventListener('change', (e) => {
+                state.currentYear = parseInt(e.target.value);
+                updateView();
+            });
+
+            // Theme
+            initTheme();
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+            // Sidebar
+            initSidebar();
+            document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
+
+            // Zoom slider
+            document.getElementById('chartZoom').addEventListener('input', (e) => {
+                state.chartHeight = parseInt(e.target.value);
+                updateChartHeight();
+            });
+
+            updateView();
+        }
+
+        function updateView() {
+            const data = BUDGET_DATA[state.currentYear];
+            if (!data) return;
+
+            // Categorize items
+            const categorized = categorizeItems(data);
+
+            // Update stats
+            updateStats(categorized);
+
+            // Draw Sankey
+            drawSankey(categorized);
+
+            // Update pillars legend
+            updatePillarsLegend(categorized);
+
+            // Update other grid
+            updateOtherGrid(categorized);
+
+            // Update whale hunter
+            updateWhaleHunter(categorized);
+        }
+
+        function categorizeItems(data) {
+            const result = {
+                total: 0,
+                pillars: {},
+                other: [],
+                whales: [],
+                excluded: { keren: 0 }
+            };
+
+            // Initialize pillars
+            Object.keys(PILLARS).forEach(key => {
+                result.pillars[key] = { items: [], total: 0 };
+            });
+
+            data.forEach(item => {
+                // Exclude קרן under החזרי חוב (but not קרן-ביטוח לאומי)
+                if (item.path[0] === 'החזרי חוב' &&
+                    item.path[1] === 'קרן' &&
+                    item.path[1] !== 'קרן-ביטוח לאומי') {
+                    result.excluded.keren += item.value;
+                    return; // Skip this item
+                }
+
+                result.total += item.value;
+
+                let matched = false;
+                for (const [key, pillar] of Object.entries(PILLARS)) {
+                    if (pillar.match(item)) {
+                        result.pillars[key].items.push(item);
+                        result.pillars[key].total += item.value;
+                        matched = true;
+                        break;
+                    }
+                }
+
+                if (!matched) {
+                    result.other.push(item);
+                    // Check if this is a "whale" - large non-pillar expense
+                    // Exclude החזרי חוב - ריבית (interest on loans is necessary)
+                    const isDebtInterest = item.path[0] === 'החזרי חוב' && item.path[1] === 'ריבית';
+                    if (item.value >= WHALE_THRESHOLD && !isDebtInterest) {
+                        result.whales.push(item);
+                    }
+                }
+            });
+
+            // Sort whales by value (largest first)
+            result.whales.sort((a, b) => b.value - a.value);
+
+            return result;
+        }
+
+        function updateStats(categorized) {
+            const pillarsSum = Object.values(categorized.pillars).reduce((sum, p) => sum + p.total, 0);
+            const otherSum = categorized.other.reduce((sum, item) => sum + item.value, 0);
+
+            document.getElementById('totalBudget').textContent = formatBillions(categorized.total) + 'B';
+            document.getElementById('pillarsTotal').textContent = formatBillions(pillarsSum) + 'B';
+            document.getElementById('otherTotal').textContent = formatBillions(otherSum) + 'B';
+            document.getElementById('otherPercent').textContent = ((otherSum / categorized.total) * 100).toFixed(1) + '%';
+        }
+
+        function drawSankey(categorized) {
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            const textColor = isDark ? '#e6edf3' : '#1f2328';
+            const bgColor = isDark ? '#161b22' : '#f6f8fa';
+
+            if (state.viewMode === 'other') {
+                drawOtherOnlySankey(categorized, isDark, textColor, bgColor);
+            } else {
+                drawFullSankey(categorized, isDark, textColor, bgColor);
+            }
+        }
+
+        function drawFullSankey(categorized, isDark, textColor, bgColor) {
+            // Build multi-level Sankey data
+            // Level 0: תקציב המדינה
+            // Level 1: 5 pillars + אחר
+            // Level 2: Sub-categories (שם רמה 2)
+            // Level 3: שם סעיף (for pillars)
+
+            const labels = [];
+            const colors = [];
+            const nodeMap = {}; // name -> index
+
+            // Add root node
+            labels.push('תקציב המדינה');
+            colors.push(isDark ? '#58a6ff' : '#0969da');
+            nodeMap['תקציב המדינה'] = 0;
+
+            // Add pillar nodes
+            Object.entries(PILLARS).forEach(([key, pillar]) => {
+                nodeMap[pillar.name] = labels.length;
+                labels.push(pillar.name);
+                colors.push(pillar.color);
+            });
+
+            // Add "other" node
+            nodeMap['אחר'] = labels.length;
+            labels.push('אחר');
+            colors.push('#8b949e');
+
+            // Build sub-category nodes for each pillar (level 2) and seif nodes (level 3)
+            const pillarSubCategories = {};
+            const pillarSeifCategories = {}; // pillarKey -> subCat -> { seif -> value }
+
+            Object.entries(PILLARS).forEach(([key, pillar]) => {
+                pillarSubCategories[key] = {};
+                pillarSeifCategories[key] = {};
+
+                categorized.pillars[key].items.forEach(item => {
+                    const subCat = item.path[1] || 'אחר';
+                    const seif = item.path[2] || 'כללי';
+
+                    // Aggregate by subCat (level 2)
+                    if (!pillarSubCategories[key][subCat]) {
+                        pillarSubCategories[key][subCat] = 0;
+                        pillarSeifCategories[key][subCat] = {};
+                    }
+                    pillarSubCategories[key][subCat] += item.value;
+
+                    // Aggregate by seif (level 3)
+                    if (!pillarSeifCategories[key][subCat][seif]) {
+                        pillarSeifCategories[key][subCat][seif] = 0;
+                    }
+                    pillarSeifCategories[key][subCat][seif] += item.value;
+                });
+
+                // Add sub-category nodes (level 2)
+                Object.keys(pillarSubCategories[key]).forEach(subCat => {
+                    const nodeName = pillar.name + ' - ' + subCat;
+                    nodeMap[nodeName] = labels.length;
+                    labels.push(subCat);
+                    colors.push(pillar.color + 'cc');
+                });
+
+                // Add seif nodes (level 3) - only top 5 per subCat to avoid clutter
+                Object.entries(pillarSeifCategories[key]).forEach(([subCat, seifs]) => {
+                    const topSeifs = Object.entries(seifs)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 5);
+
+                    topSeifs.forEach(([seif, value]) => {
+                        if (value > 100000) { // Only show items > 100M
+                            const nodeName = pillar.name + ' - ' + subCat + ' - ' + seif;
+                            nodeMap[nodeName] = labels.length;
+                            labels.push(seif);
+                            colors.push(pillar.color + '99');
+                        }
+                    });
+                });
+            });
+
+            // Build sub-categories for "other" (level 2 and 3)
+            const otherSubCategories = {};
+            const otherSeifCategories = {}; // subCat -> { seif -> value }
+
+            categorized.other.forEach(item => {
+                const subKey = item.path[0] + ' → ' + (item.path[1] || '');
+                const seif = item.path[2] || 'כללי';
+
+                if (!otherSubCategories[subKey]) {
+                    otherSubCategories[subKey] = 0;
+                    otherSeifCategories[subKey] = {};
+                }
+                otherSubCategories[subKey] += item.value;
+
+                if (!otherSeifCategories[subKey][seif]) {
+                    otherSeifCategories[subKey][seif] = 0;
+                }
+                otherSeifCategories[subKey][seif] += item.value;
+            });
+
+            // Add top "other" sub-categories (limit to top 8)
+            const topOtherSubs = Object.entries(otherSubCategories)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8);
+
+            topOtherSubs.forEach(([subCat, value]) => {
+                const nodeName = 'אחר - ' + subCat;
+                nodeMap[nodeName] = labels.length;
+                labels.push(subCat.split(' → ')[1] || subCat.split(' → ')[0]);
+                colors.push('#8b949e');
+
+                // Add seif nodes for other (level 3) - top 3 per subCat
+                const topSeifs = Object.entries(otherSeifCategories[subCat] || {})
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3);
+
+                topSeifs.forEach(([seif, seifValue]) => {
+                    if (seifValue > 500000) { // Only show items > 500M for "other"
+                        const seifNodeName = 'אחר - ' + subCat + ' - ' + seif;
+                        nodeMap[seifNodeName] = labels.length;
+                        labels.push(seif);
+                        colors.push('#8b949e99');
+                    }
+                });
+            });
+
+            // Build links
+            const source = [];
+            const target = [];
+            const values = [];
+            const linkColors = [];
+
+            // Level 0 -> Level 1: תקציב → pillars + other
+            Object.entries(PILLARS).forEach(([key, pillar]) => {
+                const total = categorized.pillars[key].total;
+                if (total > 0) {
+                    source.push(0);
+                    target.push(nodeMap[pillar.name]);
+                    values.push(total);
+                    linkColors.push(pillar.color + '60');
+                }
+            });
+
+            const otherTotal = categorized.other.reduce((sum, item) => sum + item.value, 0);
+            if (otherTotal > 0) {
+                source.push(0);
+                target.push(nodeMap['אחר']);
+                values.push(otherTotal);
+                linkColors.push('#8b949e60');
+            }
+
+            // Level 1 -> Level 2: pillars → sub-categories
+            Object.entries(PILLARS).forEach(([key, pillar]) => {
+                Object.entries(pillarSubCategories[key]).forEach(([subCat, value]) => {
+                    if (value > 0) {
+                        const nodeName = pillar.name + ' - ' + subCat;
+                        source.push(nodeMap[pillar.name]);
+                        target.push(nodeMap[nodeName]);
+                        values.push(value);
+                        linkColors.push(pillar.color + '40');
+                    }
+                });
+            });
+
+            // Level 2 -> Level 3: pillar sub-categories → seif
+            Object.entries(PILLARS).forEach(([key, pillar]) => {
+                Object.entries(pillarSeifCategories[key]).forEach(([subCat, seifs]) => {
+                    const subCatNodeName = pillar.name + ' - ' + subCat;
+                    const topSeifs = Object.entries(seifs)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 5);
+
+                    topSeifs.forEach(([seif, value]) => {
+                        if (value > 100000) { // Only link items > 100M
+                            const seifNodeName = pillar.name + ' - ' + subCat + ' - ' + seif;
+                            if (nodeMap[seifNodeName] !== undefined) {
+                                source.push(nodeMap[subCatNodeName]);
+                                target.push(nodeMap[seifNodeName]);
+                                values.push(value);
+                                linkColors.push(pillar.color + '30');
+                            }
+                        }
+                    });
+                });
+            });
+
+            // Level 1 -> Level 2: other → sub-categories
+            topOtherSubs.forEach(([subCat, value]) => {
+                const nodeName = 'אחר - ' + subCat;
+                source.push(nodeMap['אחר']);
+                target.push(nodeMap[nodeName]);
+                values.push(value);
+                linkColors.push('#8b949e40');
+            });
+
+            // Level 2 -> Level 3: other sub-categories → seif
+            topOtherSubs.forEach(([subCat, value]) => {
+                const subCatNodeName = 'אחר - ' + subCat;
+                const topSeifs = Object.entries(otherSeifCategories[subCat] || {})
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3);
+
+                topSeifs.forEach(([seif, seifValue]) => {
+                    if (seifValue > 500000) { // Only link items > 500M
+                        const seifNodeName = 'אחר - ' + subCat + ' - ' + seif;
+                        if (nodeMap[seifNodeName] !== undefined) {
+                            source.push(nodeMap[subCatNodeName]);
+                            target.push(nodeMap[seifNodeName]);
+                            values.push(seifValue);
+                            linkColors.push('#8b949e30');
+                        }
+                    }
+                });
+            });
+
+            const trace = {
+                type: 'sankey',
+                orientation: 'h',
+                node: {
+                    pad: 15,
+                    thickness: 25,
+                    line: { color: 'transparent', width: 0 },
+                    label: labels,
+                    color: colors,
+                    hovertemplate: '%{label}<br>%{value:,.0f} אלפי ש"ח<extra></extra>'
+                },
+                link: {
+                    source: source,
+                    target: target,
+                    value: values,
+                    color: linkColors,
+                    hovertemplate: '%{source.label} → %{target.label}<br>%{value:,.0f} אלפי ש"ח<extra></extra>'
+                }
+            };
+
+            const layout = {
+                paper_bgcolor: bgColor,
+                plot_bgcolor: bgColor,
+                font: { family: 'Heebo, sans-serif', color: textColor, size: 12 },
+                margin: { l: 10, r: 10, t: 10, b: 10 }
+            };
+
+            Plotly.newPlot('sankeyChart', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        function drawOtherOnlySankey(categorized, isDark, textColor, bgColor) {
+            // "Other only" view - deeper drill-down into non-pillar spending
+            // Level 0: הוצאות "אחר"
+            // Level 1: שם רמה 1 (top categories)
+            // Level 2: שם רמה 2
+            // Level 3: שם סעיף
+            // Level 4: שם תחום (if available)
+
+            const labels = [];
+            const colors = [];
+            const nodeMap = {};
+
+            const otherTotal = categorized.other.reduce((sum, item) => sum + item.value, 0);
+
+            // Add root node
+            labels.push('הוצאות "אחר" (' + formatBillions(otherTotal) + 'B)');
+            colors.push('#f85149');
+            nodeMap['root'] = 0;
+
+            // Build hierarchy: rama1 -> rama2 -> seif -> tchum
+            const hierarchy = {};
+
+            categorized.other.forEach(item => {
+                const rama1 = item.path[0] || 'לא מוגדר';
+                const rama2 = item.path[1] || 'כללי';
+                const seif = item.path[2] || 'כללי';
+                const tchum = item.path[3] || null;
+
+                if (!hierarchy[rama1]) {
+                    hierarchy[rama1] = { total: 0, children: {} };
+                }
+                hierarchy[rama1].total += item.value;
+
+                if (!hierarchy[rama1].children[rama2]) {
+                    hierarchy[rama1].children[rama2] = { total: 0, children: {} };
+                }
+                hierarchy[rama1].children[rama2].total += item.value;
+
+                if (!hierarchy[rama1].children[rama2].children[seif]) {
+                    hierarchy[rama1].children[rama2].children[seif] = { total: 0, children: {} };
+                }
+                hierarchy[rama1].children[rama2].children[seif].total += item.value;
+
+                if (tchum) {
+                    if (!hierarchy[rama1].children[rama2].children[seif].children[tchum]) {
+                        hierarchy[rama1].children[rama2].children[seif].children[tchum] = 0;
+                    }
+                    hierarchy[rama1].children[rama2].children[seif].children[tchum] += item.value;
+                }
+            });
+
+            // Color palette for rama1 categories
+            const rama1Colors = ['#f85149', '#d29922', '#a371f7', '#3fb950', '#58a6ff', '#db61a2', '#8b949e', '#f0883e'];
+            let colorIndex = 0;
+
+            // Add Level 1 nodes (rama1) - show all
+            const sortedRama1 = Object.entries(hierarchy).sort((a, b) => b[1].total - a[1].total);
+
+            sortedRama1.forEach(([rama1, data]) => {
+                const color = rama1Colors[colorIndex % rama1Colors.length];
+                colorIndex++;
+                nodeMap['r1_' + rama1] = labels.length;
+                labels.push(rama1);
+                colors.push(color);
+                data.color = color;
+            });
+
+            // Add Level 2 nodes (rama2) - top 5 per rama1
+            sortedRama1.forEach(([rama1, data]) => {
+                const sortedRama2 = Object.entries(data.children)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .slice(0, 5);
+
+                sortedRama2.forEach(([rama2, rama2Data]) => {
+                    nodeMap['r2_' + rama1 + '_' + rama2] = labels.length;
+                    labels.push(rama2);
+                    colors.push(data.color + 'cc');
+                    rama2Data.color = data.color;
+                });
+            });
+
+            // Add Level 3 nodes (seif) - top 4 per rama2, only if > 100M
+            sortedRama1.forEach(([rama1, data]) => {
+                const sortedRama2 = Object.entries(data.children)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .slice(0, 5);
+
+                sortedRama2.forEach(([rama2, rama2Data]) => {
+                    const sortedSeif = Object.entries(rama2Data.children)
+                        .sort((a, b) => b[1].total - a[1].total)
+                        .slice(0, 4);
+
+                    sortedSeif.forEach(([seif, seifData]) => {
+                        if (seifData.total > 100000) { // > 100M
+                            nodeMap['r3_' + rama1 + '_' + rama2 + '_' + seif] = labels.length;
+                            labels.push(seif);
+                            colors.push(data.color + '99');
+                            seifData.color = data.color;
+                        }
+                    });
+                });
+            });
+
+            // Add Level 4 nodes (tchum) - top 3 per seif, only if > 500M
+            sortedRama1.forEach(([rama1, data]) => {
+                const sortedRama2 = Object.entries(data.children)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .slice(0, 5);
+
+                sortedRama2.forEach(([rama2, rama2Data]) => {
+                    const sortedSeif = Object.entries(rama2Data.children)
+                        .sort((a, b) => b[1].total - a[1].total)
+                        .slice(0, 4);
+
+                    sortedSeif.forEach(([seif, seifData]) => {
+                        if (seifData.total > 100000) {
+                            const sortedTchum = Object.entries(seifData.children)
+                                .sort((a, b) => b[1] - a[1])
+                                .slice(0, 3);
+
+                            sortedTchum.forEach(([tchum, tchumValue]) => {
+                                if (tchumValue > 500000) { // > 500M
+                                    nodeMap['r4_' + rama1 + '_' + rama2 + '_' + seif + '_' + tchum] = labels.length;
+                                    labels.push(tchum);
+                                    colors.push(data.color + '66');
+                                }
+                            });
+                        }
+                    });
+                });
+            });
+
+            // Build links
+            const source = [];
+            const target = [];
+            const values = [];
+            const linkColors = [];
+
+            // Root -> Level 1
+            sortedRama1.forEach(([rama1, data]) => {
+                source.push(0);
+                target.push(nodeMap['r1_' + rama1]);
+                values.push(data.total);
+                linkColors.push(data.color + '60');
+            });
+
+            // Level 1 -> Level 2
+            sortedRama1.forEach(([rama1, data]) => {
+                const sortedRama2 = Object.entries(data.children)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .slice(0, 5);
+
+                sortedRama2.forEach(([rama2, rama2Data]) => {
+                    source.push(nodeMap['r1_' + rama1]);
+                    target.push(nodeMap['r2_' + rama1 + '_' + rama2]);
+                    values.push(rama2Data.total);
+                    linkColors.push(data.color + '40');
+                });
+            });
+
+            // Level 2 -> Level 3
+            sortedRama1.forEach(([rama1, data]) => {
+                const sortedRama2 = Object.entries(data.children)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .slice(0, 5);
+
+                sortedRama2.forEach(([rama2, rama2Data]) => {
+                    const sortedSeif = Object.entries(rama2Data.children)
+                        .sort((a, b) => b[1].total - a[1].total)
+                        .slice(0, 4);
+
+                    sortedSeif.forEach(([seif, seifData]) => {
+                        if (seifData.total > 100000) {
+                            source.push(nodeMap['r2_' + rama1 + '_' + rama2]);
+                            target.push(nodeMap['r3_' + rama1 + '_' + rama2 + '_' + seif]);
+                            values.push(seifData.total);
+                            linkColors.push(data.color + '30');
+                        }
+                    });
+                });
+            });
+
+            // Level 3 -> Level 4
+            sortedRama1.forEach(([rama1, data]) => {
+                const sortedRama2 = Object.entries(data.children)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .slice(0, 5);
+
+                sortedRama2.forEach(([rama2, rama2Data]) => {
+                    const sortedSeif = Object.entries(rama2Data.children)
+                        .sort((a, b) => b[1].total - a[1].total)
+                        .slice(0, 4);
+
+                    sortedSeif.forEach(([seif, seifData]) => {
+                        if (seifData.total > 100000) {
+                            const sortedTchum = Object.entries(seifData.children)
+                                .sort((a, b) => b[1] - a[1])
+                                .slice(0, 3);
+
+                            sortedTchum.forEach(([tchum, tchumValue]) => {
+                                if (tchumValue > 500000) {
+                                    source.push(nodeMap['r3_' + rama1 + '_' + rama2 + '_' + seif]);
+                                    target.push(nodeMap['r4_' + rama1 + '_' + rama2 + '_' + seif + '_' + tchum]);
+                                    values.push(tchumValue);
+                                    linkColors.push(data.color + '20');
+                                }
+                            });
+                        }
+                    });
+                });
+            });
+
+            const trace = {
+                type: 'sankey',
+                orientation: 'h',
+                node: {
+                    pad: 15,
+                    thickness: 25,
+                    line: { color: 'transparent', width: 0 },
+                    label: labels,
+                    color: colors,
+                    hovertemplate: '%{label}<br>%{value:,.0f} אלפי ש"ח<extra></extra>'
+                },
+                link: {
+                    source: source,
+                    target: target,
+                    value: values,
+                    color: linkColors,
+                    hovertemplate: '%{source.label} → %{target.label}<br>%{value:,.0f} אלפי ש"ח<extra></extra>'
+                }
+            };
+
+            const layout = {
+                paper_bgcolor: bgColor,
+                plot_bgcolor: bgColor,
+                font: { family: 'Heebo, sans-serif', color: textColor, size: 12 },
+                margin: { l: 10, r: 10, t: 10, b: 10 }
+            };
+
+            Plotly.newPlot('sankeyChart', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        function updatePillarsLegend(categorized) {
+            const container = document.getElementById('pillarsLegend');
+            container.innerHTML = '';
+
+            Object.entries(PILLARS).forEach(([key, pillar]) => {
+                const data = categorized.pillars[key];
+
+                // Group by שם רמה 2
+                const byR2 = {};
+                data.items.forEach(item => {
+                    const r2 = item.path[1] || 'אחר';
+                    if (!byR2[r2]) byR2[r2] = 0;
+                    byR2[r2] += item.value;
+                });
+
+                const card = document.createElement('div');
+                card.className = 'pillar-card pillar-' + key;
+                card.innerHTML = `
+                    <div class="pillar-header">
+                        <div class="pillar-name">
+                            <span class="pillar-icon">${pillar.icon}</span>
+                            ${pillar.name}
+                        </div>
+                        <div class="pillar-value">${formatBillions(data.total)}B</div>
+                    </div>
+                    <div class="pillar-items">
+                        ${Object.entries(byR2)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([name, value]) => `
+                                <div class="pillar-item">
+                                    <span>${name}</span>
+                                    <span>${formatBillions(value)}B</span>
+                                </div>
+                            `).join('')}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function updateOtherGrid(categorized) {
+            const container = document.getElementById('otherGrid');
+
+            // Group by שם רמה 2
+            const byR2 = {};
+            categorized.other.forEach(item => {
+                const key = item.path[0] + ' → ' + (item.path[1] || '');
+                if (!byR2[key]) byR2[key] = 0;
+                byR2[key] += item.value;
+            });
+
+            container.innerHTML = Object.entries(byR2)
+                .sort((a, b) => b[1] - a[1])
+                .filter(([_, value]) => value > 100000) // Only show items > 100M
+                .map(([name, value]) => `
+                    <div class="other-item">
+                        <span>${name}</span>
+                        <span class="other-item-value">${formatBillions(value)}B</span>
+                    </div>
+                `).join('');
+        }
+
+        function updateWhaleHunter(categorized) {
+            const whales = categorized.whales;
+            const whaleTotal = whales.reduce((sum, item) => sum + item.value, 0);
+
+            // Update stats
+            document.getElementById('whaleCount').textContent = whales.length;
+            document.getElementById('whaleTotal').textContent = formatBillions(whaleTotal) + 'B ₪';
+            // Potential savings - estimate 10-20% could potentially be optimized
+            const potentialSavings = whaleTotal * 0.15;
+            document.getElementById('whalePotential').textContent = formatBillions(potentialSavings) + 'B ₪';
+
+            // Build whale list
+            const container = document.getElementById('whaleList');
+            container.innerHTML = whales.slice(0, 20).map((item, index) => {
+                const fullPath = item.path.filter(p => p).join(' → ');
+                const name = item.path[2] || item.path[1] || item.path[0];
+
+                return `
+                    <div class="whale-item" onclick="this.classList.toggle('expanded')">
+                        <div class="whale-item-rank">${index + 1}</div>
+                        <div class="whale-item-info">
+                            <div class="whale-item-name">${name}</div>
+                            <div class="whale-item-path">${fullPath}</div>
+                            <div class="whale-item-details">
+                                <strong>נתיב מלא:</strong> ${item.path.join(' > ')}<br>
+                                <strong>תקציב:</strong> ${(item.value / 1000).toLocaleString('he-IL')} מיליון ₪<br>
+                                <strong>אחוז מהתקציב:</strong> ${((item.value / categorized.total) * 100).toFixed(2)}%<br>
+                                <strong>שאלה לבחינה:</strong> האם ההוצאה הזו נחוצה? האם ניתן לייעל?
+                            </div>
+                        </div>
+                        <div class="whale-item-value">${formatBillions(item.value)}B</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function formatBillions(value) {
+            return (value / 1e6).toFixed(1);
+        }
+
+        // Theme
+        function initTheme() {
+            const savedTheme = localStorage.getItem('budget-theme') || 'dark';
+            applyTheme(savedTheme);
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = current === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('budget-theme', newTheme);
+            applyTheme(newTheme);
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('themeToggle').innerHTML = theme === 'dark' ? '&#9790;' : '&#9788;';
+            if (BUDGET_DATA[state.currentYear]) {
+                const categorized = categorizeItems(BUDGET_DATA[state.currentYear]);
+                drawSankey(categorized);
+            }
+        }
+
+        // Sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const isExpanded = sidebar.classList.toggle('expanded');
+            document.body.classList.toggle('sidebar-expanded', isExpanded);
+            localStorage.setItem('sidebar-expanded', isExpanded);
+        }
+
+        function initSidebar() {
+            const isExpanded = localStorage.getItem('sidebar-expanded') === 'true';
+            if (isExpanded) {
+                document.getElementById('sidebar').classList.add('expanded');
+                document.body.classList.add('sidebar-expanded');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -205,6 +205,28 @@ def create_sunburst_file(budget_data):
     return output_path
 
 
+def create_five_pillars_file(budget_data):
+    """יצירת קובץ HTML ל-5 עמודי התקציב"""
+
+    template_path = os.path.join(os.path.dirname(__file__), 'five_pillars_template.html')
+
+    if not os.path.exists(template_path):
+        print("  תבנית five_pillars_template.html לא נמצאה, מדלג...")
+        return None
+
+    with open(template_path, 'r', encoding='utf-8') as f:
+        html_template = f.read()
+
+    json_data = json.dumps(budget_data, ensure_ascii=False)
+    final_html = html_template.replace('__BUDGET_DATA_PLACEHOLDER__', json_data)
+
+    output_path = os.path.join(os.path.dirname(__file__), 'five_pillars.html')
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(final_html)
+
+    return output_path
+
+
 def main():
     print("=" * 60)
     print("יצירת ויזואליזציה אינטראקטיבית של תקציב המדינה")
@@ -240,13 +262,19 @@ def main():
         print(f"נשמר: {ministry_path}")
 
     # יצירת HTML לתרשים Sunburst
-    print("\n[6/7] יוצר קובץ Sunburst...")
+    print("\n[6/8] יוצר קובץ Sunburst...")
     sunburst_path = create_sunburst_file(budget_data)
     if sunburst_path:
         print(f"נשמר: {sunburst_path}")
 
+    # יצירת HTML ל-5 עמודי התקציב
+    print("\n[7/8] יוצר קובץ 5 עמודי התקציב...")
+    five_pillars_path = create_five_pillars_file(budget_data)
+    if five_pillars_path:
+        print(f"נשמר: {five_pillars_path}")
+
     # פתיחה בדפדפן
-    print("\n[7/7] פותח בדפדפן...")
+    print("\n[8/8] פותח בדפדפן...")
     webbrowser.open('file://' + os.path.abspath(output_path))
 
     print("\n" + "=" * 60)
