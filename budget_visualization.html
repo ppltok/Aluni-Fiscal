@@ -481,81 +481,99 @@
         }
 
         /* ============================================ */
-        /* SIDEBAR NAVIGATION */
+        /* PERSISTENT SIDEBAR NAVIGATION */
         /* ============================================ */
         .sidebar {
             position: fixed;
             top: 0;
             right: 0;
-            width: 280px;
+            width: 70px;
             height: 100vh;
             background: var(--bg-secondary);
             border-left: 1px solid var(--border-color);
             z-index: 200;
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
             display: flex;
             flex-direction: column;
+            transition: width 0.3s ease;
+            overflow: hidden;
         }
 
-        .sidebar.open {
-            transform: translateX(0);
-        }
+        .sidebar.expanded { width: 280px; }
 
         .sidebar-header {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 15px 10px;
             border-bottom: 1px solid var(--border-color);
+            min-height: 70px;
+        }
+
+        .sidebar.expanded .sidebar-header {
+            justify-content: space-between;
+            padding: 15px 20px;
         }
 
         .sidebar-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
+            white-space: nowrap;
+            display: none;
         }
 
-        .sidebar-close {
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 24px;
-            cursor: pointer;
-            padding: 0;
-            line-height: 1;
-            transition: color 0.2s;
-        }
+        .sidebar.expanded .sidebar-title { display: block; }
 
-        .sidebar-close:hover {
+        .sidebar-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
             color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 10px 12px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            line-height: 1;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
         }
 
         .sidebar-content {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 10px 8px;
         }
 
-        .sidebar-nav {
-            list-style: none;
+        .sidebar.expanded .sidebar-content {
+            padding: 15px;
         }
 
-        .sidebar-nav-item {
-            margin-bottom: 8px;
-        }
+        .sidebar-nav { list-style: none; }
+        .sidebar-nav-item { margin-bottom: 8px; }
 
         .sidebar-nav-link {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 14px 16px;
+            justify-content: center;
+            padding: 12px 8px;
             background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
+            border: 1px solid transparent;
             border-radius: 10px;
             color: var(--text-primary);
             text-decoration: none;
             font-size: 14px;
             transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .sidebar.expanded .sidebar-nav-link {
+            justify-content: flex-start;
+            gap: 12px;
+            padding: 14px 16px;
         }
 
         .sidebar-nav-link:hover {
@@ -569,69 +587,28 @@
         }
 
         .sidebar-nav-icon {
-            width: 32px;
-            height: 32px;
-            background: var(--bg-primary);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
+            font-size: 24px;
+            flex-shrink: 0;
         }
 
         .sidebar-nav-text {
-            flex: 1;
+            display: none;
+            overflow: hidden;
         }
 
-        .sidebar-nav-label {
-            font-weight: 500;
+        .sidebar.expanded .sidebar-nav-text { display: block; }
+
+        .sidebar-nav-label { font-weight: 500; }
+        .sidebar-nav-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+        /* Adjust body for sidebar */
+        body {
+            padding-right: 70px;
+            transition: padding-right 0.3s ease;
         }
 
-        .sidebar-nav-desc {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-top: 2px;
-        }
-
-        /* Sidebar toggle button - fixed position top-right */
-        .sidebar-toggle {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 150;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 10px 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-            color: var(--text-primary);
-            font-size: 18px;
-            line-height: 1;
-        }
-
-        .sidebar-toggle:hover {
-            background: var(--accent-blue);
-            border-color: var(--accent-blue);
-        }
-
-        /* Sidebar overlay */
-        .sidebar-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 190;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s;
-        }
-
-        .sidebar-overlay.visible {
-            opacity: 1;
-            pointer-events: all;
+        body.sidebar-expanded {
+            padding-right: 280px;
         }
 
         /* ============================================ */
@@ -995,13 +972,15 @@
 
         /* Sidebar responsive */
         @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-            }
-
-            .sidebar.open ~ .sidebar-toggle {
-                display: none;
-            }
+            /* Sidebar collapses to icons only on mobile */
+            body { padding-right: 60px; }
+            body.sidebar-expanded { padding-right: 60px; }
+            .sidebar { width: 60px; }
+            .sidebar.expanded { width: 60px; }
+            .sidebar-title { display: none !important; }
+            .sidebar-nav-text { display: none !important; }
+            .sidebar-header { justify-content: center !important; }
+            .sidebar-toggle { padding: 8px 10px; font-size: 18px; }
 
             .level-filter-container {
                 margin-right: 0;
@@ -1016,13 +995,11 @@
 
         @media (max-width: 480px) {
             .sidebar-nav-link {
-                padding: 12px;
+                padding: 12px 8px;
             }
 
             .sidebar-nav-icon {
-                width: 28px;
-                height: 28px;
-                font-size: 14px;
+                font-size: 20px;
             }
 
             .level-filter-label {
@@ -1086,9 +1063,6 @@
         </div>
     </header>
 
-    <!-- Sidebar Toggle Button - Fixed Top Right -->
-    <button class="sidebar-toggle" id="sidebarToggle">&#9776;</button>
-
     <!-- Stats Bar -->
     <div class="stats-bar" id="statsBar">
         <div class="stat-card">
@@ -1147,11 +1121,11 @@
     </footer>
 
     <!-- Sidebar Navigation -->
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <!-- Sidebar - Always Visible -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <span class="sidebar-title">ויזואליזציות נוספות</span>
-            <button class="sidebar-close" id="sidebarClose">&times;</button>
+            <span class="sidebar-title">ויזואליזציות</span>
+            <button class="sidebar-toggle" id="sidebarToggle" title="הרחב/כווץ תפריט">&#9776;</button>
         </div>
         <div class="sidebar-content">
             <ul class="sidebar-nav">
@@ -1271,6 +1245,24 @@
         };
 
         // ============================================
+        // SIDEBAR FUNCTIONS
+        // ============================================
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const isExpanded = sidebar.classList.toggle('expanded');
+            document.body.classList.toggle('sidebar-expanded', isExpanded);
+            localStorage.setItem('sidebar-expanded', isExpanded);
+        }
+
+        function initSidebar() {
+            const isExpanded = localStorage.getItem('sidebar-expanded') === 'true';
+            if (isExpanded) {
+                document.getElementById('sidebar').classList.add('expanded');
+                document.body.classList.add('sidebar-expanded');
+            }
+        }
+
+        // ============================================
         // INITIALIZATION
         // ============================================
         function init() {
@@ -1293,24 +1285,8 @@
             document.getElementById('backBtn').addEventListener('click', goBack);
 
             // Sidebar toggle
-            const sidebar = document.getElementById('sidebar');
-            const sidebarToggle = document.getElementById('sidebarToggle');
-            const sidebarClose = document.getElementById('sidebarClose');
-            const sidebarOverlay = document.getElementById('sidebarOverlay');
-
-            function openSidebar() {
-                sidebar.classList.add('open');
-                sidebarOverlay.classList.add('visible');
-            }
-
-            function closeSidebar() {
-                sidebar.classList.remove('open');
-                sidebarOverlay.classList.remove('visible');
-            }
-
-            sidebarToggle.addEventListener('click', openSidebar);
-            sidebarClose.addEventListener('click', closeSidebar);
-            sidebarOverlay.addEventListener('click', closeSidebar);
+            initSidebar();
+            document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
 
             // Level filter
             document.getElementById('levelFilter').addEventListener('change', handleLevelFilter);
