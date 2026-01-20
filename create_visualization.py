@@ -52,6 +52,14 @@ def load_all_budget_data():
             if 'סוג תקציב' in df.columns:
                 df = df[df['סוג תקציב'] == 'ביצוע']
 
+            # סינון קוד רמה 2 = 62 (החזרי חוב קרן) ו-35
+            if 'קוד רמה 2' in df.columns:
+                df = df[~df['קוד רמה 2'].isin([62, 35])]
+
+            # # סינון העברות פנים תקציביות (019)
+            # if 'קוד ושם מיון רמה 1' in df.columns:
+            #     df = df[~df['קוד ושם מיון רמה 1'].astype(str).str.startswith("019")]
+
             # המרת הוצאה נטו למספר
             df['הוצאה נטו'] = pd.to_numeric(df['הוצאה נטו'], errors='coerce').fillna(0)
             df = df[df['הוצאה נטו'] > 0]
