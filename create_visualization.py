@@ -90,7 +90,9 @@ def load_all_budget_data():
                         'path': path,
                         'value': float(value),
                         'isSalary': is_salary,
-                        'miunRama1': miun_rama1
+                        'miunRama1': miun_rama1,
+                        'program': str(row.get('שם תכנית', '')) if pd.notna(row.get('שם תכנית')) else '',
+                        'classification': str(row.get('שם מיון רמה 2', '')) if pd.notna(row.get('שם מיון רמה 2')) else ''
                     })
 
             all_data[year] = data_items

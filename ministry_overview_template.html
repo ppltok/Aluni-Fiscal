@@ -806,11 +806,26 @@
         <!-- Comparison Container (shows selected items side by side) -->
         <div class="comparison-container" id="comparisonContainer"></div>
 
+        <!-- Tag Filter Panel -->
+        <div class="selection-panel" id="tagPanel" style="display:none; margin-bottom: 20px;">
+            <div class="selection-header">
+                <div class="selection-title">סינון לפי תגיות</div>
+                <div class="selection-actions">
+                    <div class="view-toggle-container">
+                        <button class="view-toggle-btn active" id="btnTagExclude" onclick="setTagMode('exclude')">הסתר מסומנים</button>
+                        <button class="view-toggle-btn" id="btnTagInclude" onclick="setTagMode('include')">הצג רק מסומנים</button>
+                    </div>
+                </div>
+            </div>
+            <div class="selected-summary" id="tagFilterList"></div>
+        </div>
+
         <!-- Selection Panel - at the bottom -->
         <div class="selection-panel" id="selectionPanel">
             <div class="selection-header">
                 <div class="selection-title" id="selectionTitle">בחר פריטים להשוואה</div>
                 <div class="selection-actions">
+                    <button class="selection-btn" onclick="promptAddTag()">🏷️ הוסף תגית</button>
                     <button class="selection-btn" onclick="selectAll()">בחר הכל</button>
                     <button class="selection-btn danger" onclick="clearSelection()">נקה בחירה</button>
                 </div>
@@ -884,7 +899,14 @@
             viewMode: 'nominal',
             selectedItems: [], // Array of selected item names for comparison
             // Each selected item can have its own drill-down path
-            itemDrilldowns: {} // { itemName: { path: [], levelIndex: 0 } }
+            itemDrilldowns: {}, // { itemName: { path: [], levelIndex: 0 } }
+            
+            // Tagging System
+            itemTags: JSON.parse(localStorage.getItem('budget-tags') || '{}'),
+            tagFilters: {
+                mode: 'exclude',
+                activeTags: []
+            }
         };
 
         // ============================================
@@ -932,6 +954,7 @@
 
             // Apply theme and render
             applyTheme();
+            renderTagFilters();
             updateView();
         }
 
@@ -1032,7 +1055,21 @@
                 }
             });
 
-            return Object.values(aggregated).sort((a, b) => b.value - a.value);
+            let result = Object.values(aggregated);
+
+            // Filter by tags
+            if (state.tagFilters.activeTags.length > 0) {
+                const mode = state.tagFilters.mode;
+                const activeTags = state.tagFilters.activeTags;
+
+                result = result.filter(item => {
+                    const itemTags = state.itemTags[item.name] || [];
+                    const hasTag = activeTags.some(tag => itemTags.includes(tag));
+                    return mode === 'include' ? hasTag : !hasTag;
+                });
+            }
+
+            return result.sort((a, b) => b.value - a.value);
         }
 
         function getChildrenOf(parentName, drilldownPath) {
@@ -1074,8 +1111,22 @@
 
             const canDrillDown = childLevelIndex + 1 < hierarchyColumns.length;
 
+            let result = Object.values(aggregated);
+
+            // Filter by tags
+            if (state.tagFilters.activeTags.length > 0) {
+                const mode = state.tagFilters.mode;
+                const activeTags = state.tagFilters.activeTags;
+
+                result = result.filter(item => {
+                    const itemTags = state.itemTags[item.name] || [];
+                    const hasTag = activeTags.some(tag => itemTags.includes(tag));
+                    return mode === 'include' ? hasTag : !hasTag;
+                });
+            }
+
             return {
-                children: Object.values(aggregated).sort((a, b) => b.value - a.value),
+                children: result.sort((a, b) => b.value - a.value),
                 canDrillDown,
                 levelIndex: childLevelIndex
             };
@@ -1145,6 +1196,89 @@
                 state.itemDrilldowns[parentName].path = [];
                 updateComparisonCharts();
             }
+        }
+
+        // ============================================
+        // TAGGING SYSTEM
+        // ============================================
+        function promptAddTag() {
+            if (state.selectedItems.length === 0) {
+                alert('יש לבחור פריטים תחילה');
+                return;
+            }
+            const tag = prompt('הכנס שם לתגית:');
+            if (!tag) return;
+
+            state.selectedItems.forEach(name => {
+                if (!state.itemTags[name]) state.itemTags[name] = [];
+                if (!state.itemTags[name].includes(tag)) {
+                    state.itemTags[name].push(tag);
+                }
+            });
+            saveTags();
+            updateView();
+        }
+
+        function removeTag(itemName, tag) {
+            if (state.itemTags[itemName]) {
+                state.itemTags[itemName] = state.itemTags[itemName].filter(t => t !== tag);
+                if (state.itemTags[itemName].length === 0) {
+                    delete state.itemTags[itemName];
+                }
+                saveTags();
+                updateView();
+            }
+        }
+
+        function saveTags() {
+            localStorage.setItem('budget-tags', JSON.stringify(state.itemTags));
+            renderTagFilters();
+        }
+
+        function getAllTags() {
+            const tags = new Set();
+            Object.values(state.itemTags).forEach(list => list.forEach(t => tags.add(t)));
+            return Array.from(tags).sort();
+        }
+
+        function renderTagFilters() {
+            const tags = getAllTags();
+            const container = document.getElementById('tagPanel');
+            const list = document.getElementById('tagFilterList');
+
+            if (tags.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'block';
+
+            list.innerHTML = tags.map(tag => {
+                const isActive = state.tagFilters.activeTags.includes(tag);
+                return `
+                    <div class="selected-chip" style="cursor:pointer; ${isActive ? 'background:var(--accent-blue); color:white;' : ''}"
+                         onclick="toggleTagFilter('${escapeHtml(tag)}')">
+                        <span>${escapeHtml(tag)}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleTagFilter(tag) {
+            const idx = state.tagFilters.activeTags.indexOf(tag);
+            if (idx >= 0) {
+                state.tagFilters.activeTags.splice(idx, 1);
+            } else {
+                state.tagFilters.activeTags.push(tag);
+            }
+            renderTagFilters();
+            updateView();
+        }
+
+        function setTagMode(mode) {
+            state.tagFilters.mode = mode;
+            document.getElementById('btnTagExclude').classList.toggle('active', mode === 'exclude');
+            document.getElementById('btnTagInclude').classList.toggle('active', mode === 'include');
+            updateView();
         }
 
         // ============================================
@@ -1228,8 +1362,15 @@
                 textfont: { color: textColor, size: 28 },
                 hovertemplate: '<b>%{y}</b><br>' +
                     `תקציב: %{x:,.0f} ${unitLabel}<br>` +
-                    'אחוז שכר: %{customdata:.1f}%<extra></extra>',
-                customdata: items.map(d => d.value > 0 ? (d.salaryValue / d.value * 100) : 0)
+                    'אחוז שכר: %{customdata[0]:.1f}%<br>' +
+                    '%{customdata[1]}<extra></extra>',
+                customdata: items.map(d => {
+                    const tags = state.itemTags[d.name];
+                    return [
+                        d.value > 0 ? (d.salaryValue / d.value * 100) : 0,
+                        tags && tags.length ? `תגיות: ${tags.join(', ')}` : ''
+                    ];
+                })
             };
 
             const layout = {
@@ -1295,10 +1436,22 @@
             grid.innerHTML = items.map(item => {
                 const isSelected = state.selectedItems.includes(item.name);
                 const displayVal = formatShortValue(item.value);
+                const tags = state.itemTags[item.name] || [];
+                const tagHtml = tags.map(t =>
+                    `<span style="font-size:10px; background:rgba(88, 166, 255, 0.2); padding:2px 6px; border-radius:10px; margin-right:4px; display:inline-block; cursor:pointer;"
+                           onclick="removeTag('${escapeHtml(item.name)}', '${escapeHtml(t)}'); event.stopPropagation();"
+                           title="לחץ להסרת תגית">
+                        ${escapeHtml(t)} &times;
+                    </span>`
+                ).join('');
+
                 return `
                     <div class="selection-item ${isSelected ? 'selected' : ''}" onclick="toggleSelection('${escapeHtml(item.name)}')">
                         <div class="selection-checkbox"></div>
-                        <div class="selection-label" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                        <div class="selection-label" title="${escapeHtml(item.name)}">
+                            ${escapeHtml(item.name)}
+                            ${tagHtml ? `<div style="margin-top:4px;">${tagHtml}</div>` : ''}
+                        </div>
                         <div class="selection-value">${displayVal}</div>
                     </div>
                 `;

@@ -650,6 +650,43 @@
             color: var(--text-primary);
         }
 
+        /* Group By Dropdown */
+        .group-by-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-right: 20px;
+        }
+
+        .group-by-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .group-by-selector {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            min-width: 150px;
+        }
+
+        .group-by-selector:hover, .group-by-selector:focus {
+            border-color: var(--accent-blue);
+            outline: none;
+        }
+
+        .group-by-selector option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
         /* Theme toggle button */
         .theme-toggle {
             background: var(--bg-tertiary);
@@ -991,6 +1028,16 @@
             .level-filter {
                 flex: 1;
             }
+
+            .group-by-container {
+                margin-right: 0;
+                margin-top: 10px;
+                width: 100%;
+            }
+
+            .group-by-selector {
+                flex: 1;
+            }
         }
 
         @media (max-width: 480px) {
@@ -1050,6 +1097,15 @@
                     <option value="4">תחום פעילות</option>
                     <option value="5">תקנה</option>
                     <option value="6">סוג הוצאה</option>
+                </select>
+            </div>
+
+            <div class="group-by-container">
+                <span class="group-by-label">קבץ לפי:</span>
+                <select class="group-by-selector" id="groupBySelector">
+                    <option value="default">מבנה תקציב</option>
+                    <option value="program">תכנית</option>
+                    <option value="classification">סוג מיון</option>
                 </select>
             </div>
 
@@ -1225,14 +1281,18 @@
         // ============================================
         // STATE MANAGEMENT
         // ============================================
+        const DEFAULT_HIERARCHY = ['שם רמה 1', 'שם רמה 2', 'שם סעיף', 'שם תחום', 'שם תקנה', 'שם מיון רמה 1'];
+        const DEFAULT_LEVEL_NAMES = ['תקציב המדינה', 'תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה', 'סוג הוצאה'];
+
         const state = {
             currentYear: 2024,
             currentPath: [],
             currentData: null,
-            hierarchy: ['שם רמה 1', 'שם רמה 2', 'שם סעיף', 'שם תחום', 'שם תקנה', 'שם מיון רמה 1'],
-            levelNames: ['תקציב המדינה', 'תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה', 'סוג הוצאה'],
+            hierarchy: [...DEFAULT_HIERARCHY],
+            levelNames: [...DEFAULT_LEVEL_NAMES],
             flatViewLevel: null,  // When set, shows ALL items at this level across entire budget
-            viewMode: 'nominal'   // 'nominal' or 'gdp'
+            viewMode: 'nominal',   // 'nominal' or 'gdp'
+            groupBy: 'default'
         };
 
         // ============================================
@@ -1300,6 +1360,9 @@
             // Level filter
             document.getElementById('levelFilter').addEventListener('change', handleLevelFilter);
 
+            // Group By selector
+            document.getElementById('groupBySelector').addEventListener('change', handleGroupBy);
+
             // Theme toggle
             initTheme();
             document.getElementById('themeToggle').addEventListener('click', toggleTheme);
@@ -1360,13 +1423,15 @@
         }
 
         function loadYear(year) {
-            const yearData = BUDGET_DATA[year];
-            if (!yearData) {
+            const rawData = BUDGET_DATA[year];
+            if (!rawData) {
                 console.error('No data for year:', year);
                 return;
             }
 
-            state.currentData = yearData;
+            // Process data based on grouping
+            state.currentData = processData(rawData);
+            const yearData = state.currentData;
 
             // Validate that the current path exists in this year's data
             // If not, trim the path to the last valid level
@@ -1398,6 +1463,73 @@
             }
 
             return validPath;
+        }
+
+        // ============================================
+        // DATA PROCESSING (GROUP BY)
+        // ============================================
+        function processData(data) {
+            const groupBy = state.groupBy;
+            
+            if (groupBy === 'default') {
+                // Reset hierarchy
+                state.hierarchy = [...DEFAULT_HIERARCHY];
+                state.levelNames = [...DEFAULT_LEVEL_NAMES];
+                return data;
+            }
+
+            // Update hierarchy based on grouping
+            if (groupBy === 'program') {
+                state.hierarchy = ['תכנית', ...DEFAULT_HIERARCHY];
+                state.levelNames = ['תקציב המדינה', 'תכנית', 'תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה', 'סוג הוצאה'];
+            } else if (groupBy === 'classification') {
+                state.hierarchy = ['סוג מיון', ...DEFAULT_HIERARCHY];
+                state.levelNames = ['תקציב המדינה', 'סוג מיון', 'תחום', 'תת-תחום', 'משרד', 'תחום פעילות', 'תקנה', 'סוג הוצאה'];
+            }
+
+            // Transform data items
+            const filteredData = [];
+            
+            data.forEach(item => {
+                let groupVal = '';
+                if (groupBy === 'program') {
+                    groupVal = item.program;
+                } else if (groupBy === 'classification') {
+                    groupVal = item.classification;
+                }
+
+                // Filter out items that don't have the selected tag
+                if (groupVal && groupVal !== '') {
+                    // Shallow copy
+                    const newItem = { ...item };
+                    // Prepend to path
+                    newItem.path = [groupVal, ...item.path];
+                    filteredData.push(newItem);
+                }
+            });
+            
+            return filteredData;
+        }
+
+        function handleGroupBy(e) {
+            state.groupBy = e.target.value;
+            state.currentPath = []; // Reset path when changing grouping
+            state.flatViewLevel = null;
+            
+            loadYear(state.currentYear);
+            updateLevelFilterOptions();
+        }
+
+        function updateLevelFilterOptions() {
+            const select = document.getElementById('levelFilter');
+            select.innerHTML = '';
+            
+            state.levelNames.forEach((name, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = name;
+                select.appendChild(option);
+            });
         }
 
         // ============================================
