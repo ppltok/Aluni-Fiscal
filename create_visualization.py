@@ -32,6 +32,7 @@ def load_all_budget_data():
     all_files = glob.glob("tableau_BudgetData*.xlsx") + glob.glob("tableau_tableau_BudgetData*.xlsx")
 
     all_data = {}
+    all_income = {}
 
     for filename in all_files:
         try:
@@ -45,7 +46,45 @@ def load_all_budget_data():
             if year < 2015 or year > 2024:
                 continue
 
-            # סינון רק הוצאות וביצוע
+            # יצירת מבנה נתונים להיררכיה
+            hierarchy_cols = ['שם רמה 1', 'שם רמה 2', 'שם סעיף', 'שם תחום', 'שם תקנה', 'שם מיון רמה 1']
+
+            # --- עיבוד הכנסות ---
+            income_items = []
+            if 'הוצאה/הכנסה' in df.columns:
+                income_df = df[df['הוצאה/הכנסה'] == 'הכנסה']
+                
+                if 'סוג תקציב' in income_df.columns:
+                    income_df = income_df[income_df['סוג תקציב'] == 'ביצוע']
+                
+                # סינון שורות שבהן שם רמה 1 הוא "הכנסות" (הכנסות מדינה כלליות ולא של משרדים)
+                if 'שם רמה 1' in income_df.columns:
+                    income_df = income_df[income_df['שם רמה 1'] != 'הכנסות']
+
+                income_df['הוצאה נטו'] = pd.to_numeric(income_df['הוצאה נטו'], errors='coerce').fillna(0)
+                
+                for _, row in income_df.iterrows():
+                    path = []
+                    for col in hierarchy_cols:
+                        raw_val = row.get(col, '')
+                        if pd.notna(raw_val):
+                            path.append(normalize_name(str(raw_val)))
+                        else:
+                            path.append('')
+                    
+                    value = row['הוצאה נטו']
+                    
+                    # הכנסות יכולות להיות חיוביות או שליליות, ניקח את הערך המוחלט אם זה שלילי אבל בדרך כלל זה חיובי בטור הזה
+                    # אם הערך הוא 0 נדלג
+                    if value != 0 and path[0]:
+                        income_items.append({
+                            'path': path,
+                            'value': float(value)
+                        })
+            
+            all_income[year] = income_items
+
+            # --- עיבוד הוצאות ---
             if 'הוצאה/הכנסה' in df.columns:
                 df = df[df['הוצאה/הכנסה'] == 'הוצאה']
 
@@ -56,17 +95,9 @@ def load_all_budget_data():
             if 'קוד רמה 2' in df.columns:
                 df = df[~df['קוד רמה 2'].isin([62, 35])]
 
-            # # סינון העברות פנים תקציביות (019)
-            # if 'קוד ושם מיון רמה 1' in df.columns:
-            #     df = df[~df['קוד ושם מיון רמה 1'].astype(str).str.startswith("019")]
-
             # המרת הוצאה נטו למספר
             df['הוצאה נטו'] = pd.to_numeric(df['הוצאה נטו'], errors='coerce').fillna(0)
             df = df[df['הוצאה נטו'] > 0]
-
-            # יצירת מבנה נתונים להיררכיה
-            # הוספת שם מיון רמה 1 כרמה האחרונה (שכר/קניות/העברות/השקעה)
-            hierarchy_cols = ['שם רמה 1', 'שם רמה 2', 'שם סעיף', 'שם תחום', 'שם תקנה', 'שם מיון רמה 1']
 
             data_items = []
             for _, row in df.iterrows():
@@ -96,15 +127,15 @@ def load_all_budget_data():
                     })
 
             all_data[year] = data_items
-            print(f"  נטענו {len(data_items)} רשומות לשנת {year}")
+            print(f"  נטענו {len(data_items)} רשומות הוצאה ו-{len(income_items)} רשומות הכנסה לשנת {year}")
 
         except Exception as e:
             print(f"שגיאה בטעינת {filename}: {e}")
 
-    return all_data
+    return all_data, all_income
 
 
-def create_html_file(budget_data):
+def create_html_file(budget_data, income_data):
     """יצירת קובץ HTML עם הנתונים"""
 
     # קריאת התבנית
@@ -115,9 +146,11 @@ def create_html_file(budget_data):
 
     # המרת הנתונים ל-JSON
     json_data = json.dumps(budget_data, ensure_ascii=False)
+    json_income = json.dumps(income_data, ensure_ascii=False)
 
     # החלפת placeholder
     final_html = html_template.replace('__BUDGET_DATA_PLACEHOLDER__', json_data)
+    final_html = final_html.replace('__INCOME_DATA_PLACEHOLDER__', json_income)
 
     # שמירה
     output_path = os.path.join(os.path.dirname(__file__), 'budget_interactive.html')
@@ -244,13 +277,13 @@ def main():
 
     # טעינת נתונים
     print("\n[1/7] טוען נתונים מכל השנים...")
-    budget_data = load_all_budget_data()
+    budget_data, income_data = load_all_budget_data()
 
     print(f"\nנטענו נתונים ל-{len(budget_data)} שנים: {sorted(budget_data.keys())}")
 
     # יצירת HTML ראשי
     print("\n[2/7] יוצר קובץ HTML ראשי...")
-    output_path = create_html_file(budget_data)
+    output_path = create_html_file(budget_data, income_data)
     print(f"נשמר: {output_path}")
 
     # יצירת HTML להשוואה שנתית
