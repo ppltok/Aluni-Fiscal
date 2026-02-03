@@ -1130,6 +1130,10 @@
             <div class="stat-value green" id="totalIncome">--</div>
         </div>
         <div class="stat-card">
+            <div class="stat-label">התחייבויות מהשנה</div>
+            <div class="stat-value orange" id="totalCommitments">--</div>
+        </div>
+        <div class="stat-card">
             <div class="stat-label">תחום גדול ביותר</div>
             <div class="stat-value green" id="topCategory">--</div>
         </div>
@@ -1253,6 +1257,7 @@
         // ============================================
         const BUDGET_DATA = __BUDGET_DATA_PLACEHOLDER__;
         const INCOME_DATA = __INCOME_DATA_PLACEHOLDER__;
+        const COMMITMENT_DATA = __COMMITMENT_DATA_PLACEHOLDER__;
 
         // GDP Data (in thousands of NIS to match budget data units)
         // 1 Billion NIS = 1,000,000 thousands
@@ -1587,7 +1592,39 @@
                 currentIncome = filteredIncome.reduce((sum, item) => sum + item.value, 0);
             }
 
-            document.getElementById('totalIncome').textContent = formatValue(Math.abs(currentIncome));
+            document.getElementById('totalIncome').textContent = formatValue(currentIncome);
+
+            // Total commitments for the year (filtered by current path)
+            let currentCommitments = 0;
+            const rawCommitmentData = COMMITMENT_DATA[state.currentYear] || [];
+
+            if (state.groupBy !== 'default') {
+                // If grouped, we can't easily filter commitments by path as structure differs
+                // Show total only at root
+                if (state.currentPath.length === 0) {
+                    currentCommitments = rawCommitmentData.reduce((sum, item) => sum + item.value, 0);
+                } else {
+                    currentCommitments = 0;
+                }
+            } else {
+                // Default hierarchy - filter by path
+                let filteredCommitments = rawCommitmentData;
+                
+                if (!isFlatView) {
+                    // Filter by current path
+                    filteredCommitments = filteredCommitments.filter(item => {
+                        if (item.path.length < state.currentPath.length) return false;
+                        for (let i = 0; i < state.currentPath.length; i++) {
+                            if (item.path[i] !== state.currentPath[i]) return false;
+                        }
+                        return true;
+                    });
+                }
+                
+                currentCommitments = filteredCommitments.reduce((sum, item) => sum + item.value, 0);
+            }
+
+            document.getElementById('totalCommitments').textContent = formatValue(currentCommitments);
 
             // Top category at current level - aggregate by the level index
             const aggregated = {};
