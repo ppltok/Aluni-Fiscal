@@ -344,9 +344,15 @@ def load_paid_supports_data(budget_data):
             })
         
         # Build hierarchical flow data for Sankey diagram
-        # Structure: רמה 1 → רמה 2 → סעיף → תקנה
-        flow_data = build_flow_data(budget_info_by_year.get(year, {}), by_code)
-        
+        # Structure: רמה 1 → רמה 2 → סעיף → תקנה → מקבלי תמיכות
+        # ONLY codes with actual paid supports, flow = paid amounts
+        flow_data = build_flow_data(budget_info_by_year.get(year, {}), by_code, recipients_by_code)
+
+        # Build convergent flow data (budget ← takana → recipients)
+        convergent_flow_data = build_convergent_flow_data(
+            budget_info_by_year.get(year, {}), by_code, recipients_by_code
+        )
+
         orphan_sum = orphan_df['סכום ששולם'].sum()
         matched_sum = matched_df['סכום ששולם'].sum() if len(matched_df) > 0 else 0
         
@@ -358,6 +364,7 @@ def load_paid_supports_data(budget_data):
             'recipients': recipients,
             'recipientsByCode': recipients_by_code,
             'flowData': flow_data,
+            'convergentFlowData': convergent_flow_data,
             'orphanRecords': int(len(orphan_df)),
             'orphanAmount': (float(orphan_sum) / 1000.0) if pd.notna(orphan_sum) else 0.0,  # In thousands
             'orphanCodes': int(orphan_df['קוד_תקנה'].nunique()) if len(orphan_df) > 0 else 0
@@ -368,47 +375,57 @@ def load_paid_supports_data(budget_data):
     return paid_data
 
 
-def build_flow_data(budget_info, paid_by_code):
+def build_flow_data(budget_info, paid_by_code, recipients_by_code=None):
     """
     Build hierarchical flow data for Sankey diagram.
-    
+    ONLY includes budget codes that actually have paid supports.
+    Flow values represent actual paid amounts (not budget allocations).
+
+    Hierarchy: רמה 1 → רמה 2 → סעיף → תקנה → מקבלי תמיכות (top 5)
+
     Returns:
     {
         'nodes': [
-            { 'id': 'r1_שירותים חברתיים', 'name': 'שירותים חברתיים', 'level': 1, 'budget': X, 'paid': Y },
+            { 'id': '...', 'name': '...', 'level': 1-5, 'budget': X, 'paid': Y },
             ...
         ],
         'links': [
-            { 'source': 'r1_שירותים חברתיים', 'target': 'r2_חינוך', 'budget': X, 'paid': Y },
+            { 'source': '...', 'target': '...', 'paid': Y },
             ...
         ]
     }
     """
-    # Aggregate budget and paid amounts by hierarchy level
-    # Level 1: רמה 1, Level 2: רמה 2, Level 3: סעיף, Level 4: תקנה (code)
-    
+    if recipients_by_code is None:
+        recipients_by_code = {}
+
     hierarchy = {}  # path_key -> { budget, paid, children }
-    
-    for code, info in budget_info.items():
+
+    # ONLY iterate over codes that have actual paid supports
+    for code_str, paid_info in paid_by_code.items():
+        code = int(code_str) if code_str.isdigit() else 0
+        paid = paid_info.get('paid', 0)
+        if paid <= 0:
+            continue
+
+        # Find budget info for this code
+        info = budget_info.get(code, {})
         path = info.get('path', [])
         if len(path) < 3:
             continue
-            
+
         rama1 = path[0] if len(path) > 0 and path[0] else 'לא מוגדר'
         rama2 = path[1] if len(path) > 1 and path[1] else 'לא מוגדר'
         seif = path[2] if len(path) > 2 and path[2] else 'לא מוגדר'
-        takana_name = info.get('name', str(code))
-        
+        takana_name = paid_info.get('name', info.get('name', str(code)))
+
         budget = info.get('value', 0)
-        paid_info = paid_by_code.get(str(code), {})
-        paid = paid_info.get('paid', 0)
-        
+
         # Build hierarchy keys
         r1_key = f"r1_{rama1}"
         r2_key = f"r2_{rama1}_{rama2}"
         r3_key = f"r3_{rama1}_{rama2}_{seif}"
         r4_key = f"r4_{code}"
-        
+
         # Initialize nodes if not exist
         if r1_key not in hierarchy:
             hierarchy[r1_key] = {'name': rama1, 'level': 1, 'budget': 0, 'paid': 0, 'children': set()}
@@ -418,56 +435,343 @@ def build_flow_data(budget_info, paid_by_code):
             hierarchy[r3_key] = {'name': seif, 'level': 3, 'budget': 0, 'paid': 0, 'children': set(), 'parent': r2_key}
         if r4_key not in hierarchy:
             hierarchy[r4_key] = {'name': takana_name, 'level': 4, 'budget': 0, 'paid': 0, 'code': code, 'parent': r3_key}
-        
-        # Aggregate values
+
+        # Aggregate values - use PAID as the flow amount
         hierarchy[r1_key]['budget'] += budget
         hierarchy[r1_key]['paid'] += paid
         hierarchy[r1_key]['children'].add(r2_key)
-        
+
         hierarchy[r2_key]['budget'] += budget
         hierarchy[r2_key]['paid'] += paid
         hierarchy[r2_key]['children'].add(r3_key)
-        
+
         hierarchy[r3_key]['budget'] += budget
         hierarchy[r3_key]['paid'] += paid
         hierarchy[r3_key]['children'].add(r4_key)
-        
+
         hierarchy[r4_key]['budget'] += budget
         hierarchy[r4_key]['paid'] += paid
-    
+
+        # Level 5: Top recipients for this code
+        if code_str in recipients_by_code:
+            recipients = sorted(recipients_by_code[code_str], key=lambda r: -r.get('paid', 0))
+            top_recipients = recipients[:5]
+            recipients_sum_thousands = 0
+
+            for i, r in enumerate(top_recipients):
+                r_paid_thousands = r.get('paid', 0) / 1000.0  # Convert ILS to thousands
+                if r_paid_thousands <= 0:
+                    continue
+                # Cap at code's total paid
+                if recipients_sum_thousands + r_paid_thousands > paid:
+                    r_paid_thousands = max(0, paid - recipients_sum_thousands)
+                if r_paid_thousands <= 0:
+                    continue
+
+                recipients_sum_thousands += r_paid_thousands
+                r_key = f"r5_{code}_{i}"
+                r_name = r.get('name', 'לא ידוע')
+
+                if r_key not in hierarchy:
+                    hierarchy[r_key] = {
+                        'name': r_name, 'level': 5,
+                        'budget': 0, 'paid': r_paid_thousands,
+                        'parent': r4_key
+                    }
+
+            # "Others" remainder
+            remainder = paid - recipients_sum_thousands
+            if remainder > 0.1:
+                others_count = paid_info.get('recipients', 0) - len(top_recipients)
+                others_label = f'אחרים ({others_count})' if others_count > 0 else 'אחרים'
+                others_key = f"r5_{code}_others"
+                if others_key not in hierarchy:
+                    hierarchy[others_key] = {
+                        'name': others_label, 'level': 5,
+                        'budget': 0, 'paid': remainder,
+                        'parent': r4_key
+                    }
+
     # Convert to nodes and links format
     nodes = []
     links = []
-    
+
     for key, data in hierarchy.items():
         node = {
             'id': key,
             'name': data['name'],
             'level': data['level'],
-            'budget': data['budget'],
+            'budget': data.get('budget', 0),
             'paid': data['paid']
         }
         if 'code' in data:
             node['code'] = data['code']
         nodes.append(node)
-        
-        # Create link to parent
+
+        # Create link to parent - flow is based on PAID amount
         if 'parent' in data:
             links.append({
                 'source': data['parent'],
                 'target': key,
-                'budget': data['budget'],
+                'budget': data.get('budget', 0),
                 'paid': data['paid']
             })
-    
-    # Sort nodes by level and budget
-    nodes.sort(key=lambda x: (x['level'], -x['budget']))
-    
-    # Convert children sets to lists (for JSON serialization)
-    for key in hierarchy:
-        if 'children' in hierarchy[key]:
-            hierarchy[key]['children'] = list(hierarchy[key]['children'])
-    
+
+    # Sort nodes by level and paid amount (not budget)
+    nodes.sort(key=lambda x: (x['level'], -x['paid']))
+
+    return {
+        'nodes': nodes,
+        'links': links
+    }
+
+
+def build_convergent_flow_data(budget_info, paid_by_code, recipients_by_code=None):
+    """
+    Build convergent flow data for Sankey diagram.
+    BOTH sides use PAID (execution) amounts — they should balance.
+
+    LEFT side: Budget hierarchy (Rama1 → Rama2 → Seif → Takana) — paid amounts flowing in
+    RIGHT side: Takana → Recipients — paid amounts flowing out
+    GAP nodes: If budget != paid, the difference is shown as a red "gap" node flowing left
+      - budget > paid → "לא שולם כתמיכה" (money allocated but not paid as support)
+      - paid > budget → "חריגה מתקציב" (paid more than budgeted)
+
+    Each node includes pre-computed x,y coordinates for manual positioning.
+    """
+    if recipients_by_code is None:
+        recipients_by_code = {}
+
+    hierarchy = {}  # key -> node data
+    gap_nodes = []  # gap/discrepancy nodes to add at level 0 (left of everything)
+
+    # x positions for each level (normalized 0-1)
+    # Level 0 = gap nodes (far left), levels 1-3 = budget hierarchy, 4 = takana, 5 = recipients
+    X_POSITIONS = {0: 0.001, 1: 0.05, 2: 0.22, 3: 0.40, 4: 0.58, 5: 0.85}
+
+    # ONLY iterate over codes that have actual paid supports
+    for code_str, paid_info in paid_by_code.items():
+        code = int(code_str) if code_str.isdigit() else 0
+        paid = paid_info.get('paid', 0)
+        if paid <= 0:
+            continue
+
+        info = budget_info.get(code, {})
+        path = info.get('path', [])
+        if len(path) < 3:
+            continue
+
+        rama1 = path[0] if len(path) > 0 and path[0] else 'לא מוגדר'
+        rama2 = path[1] if len(path) > 1 and path[1] else 'לא מוגדר'
+        seif = path[2] if len(path) > 2 and path[2] else 'לא מוגדר'
+        takana_name = paid_info.get('name', info.get('name', str(code)))
+        budget = info.get('value', 0)
+
+        # Build hierarchy keys
+        l1_key = f"L1_{rama1}"
+        l2_key = f"L2_{rama1}_{rama2}"
+        l3_key = f"L3_{rama1}_{rama2}_{seif}"
+        l4_key = f"L4_{code}"
+
+        # Initialize LEFT SIDE nodes (levels 1-3)
+        # ALL flows use PAID amounts (both sides = execution)
+        if l1_key not in hierarchy:
+            hierarchy[l1_key] = {
+                'name': rama1, 'level': 1, 'side': 'left',
+                'budget': 0, 'paid': 0, 'children': set()
+            }
+        if l2_key not in hierarchy:
+            hierarchy[l2_key] = {
+                'name': rama2, 'level': 2, 'side': 'left',
+                'budget': 0, 'paid': 0, 'children': set(), 'parent': l1_key
+            }
+        if l3_key not in hierarchy:
+            hierarchy[l3_key] = {
+                'name': seif, 'level': 3, 'side': 'left',
+                'budget': 0, 'paid': 0, 'children': set(), 'parent': l2_key
+            }
+
+        # CENTER node (takana)
+        if l4_key not in hierarchy:
+            hierarchy[l4_key] = {
+                'name': f"{code}-{takana_name}", 'level': 4, 'side': 'center',
+                'budget': 0, 'paid': 0, 'code': code, 'parent': l3_key
+            }
+
+        # Aggregate PAID values for LEFT side (same amounts as right — both = execution)
+        hierarchy[l1_key]['budget'] += budget
+        hierarchy[l1_key]['paid'] += paid
+        hierarchy[l1_key]['children'].add(l2_key)
+
+        hierarchy[l2_key]['budget'] += budget
+        hierarchy[l2_key]['paid'] += paid
+        hierarchy[l2_key]['children'].add(l3_key)
+
+        hierarchy[l3_key]['budget'] += budget
+        hierarchy[l3_key]['paid'] += paid
+        hierarchy[l3_key]['children'].add(l4_key)
+
+        hierarchy[l4_key]['budget'] += budget
+        hierarchy[l4_key]['paid'] += paid
+
+        # GAP: budget vs paid discrepancy for this takana
+        gap = budget - paid
+        if abs(gap) > 10:  # Only show gaps > 10K ILS
+            if gap > 0:
+                # Budget > Paid: money allocated but NOT paid as support
+                gap_key = f"GAP_{code}_unused"
+                gap_nodes.append({
+                    'key': gap_key,
+                    'name': f"⚠ לא שולם ({(gap/1e3):.0f}M)",
+                    'level': 0, 'side': 'gap',
+                    'budget': budget, 'paid': paid, 'gap': gap,
+                    'gap_type': 'unused',
+                    'parent_takana': l4_key
+                })
+            else:
+                # Paid > Budget: over-budget spending
+                gap_key = f"GAP_{code}_over"
+                gap_nodes.append({
+                    'key': gap_key,
+                    'name': f"🔴 חריגה ({(-gap/1e3):.0f}M)",
+                    'level': 0, 'side': 'gap',
+                    'budget': budget, 'paid': paid, 'gap': abs(gap),
+                    'gap_type': 'over',
+                    'parent_takana': l4_key
+                })
+
+        # RIGHT SIDE: Top recipients for this takana (level 5)
+        if code_str in recipients_by_code:
+            recipients = sorted(recipients_by_code[code_str], key=lambda r: -r.get('paid', 0))
+            top_recipients = recipients[:5]
+            recipients_sum_thousands = 0
+
+            for i, r in enumerate(top_recipients):
+                r_paid_thousands = r.get('paid', 0) / 1000.0  # Convert ILS to thousands
+                if r_paid_thousands <= 0:
+                    continue
+                if recipients_sum_thousands + r_paid_thousands > paid:
+                    r_paid_thousands = max(0, paid - recipients_sum_thousands)
+                if r_paid_thousands <= 0:
+                    continue
+
+                recipients_sum_thousands += r_paid_thousands
+                r_key = f"R5_{code}_{i}"
+                r_name = r.get('name', 'לא ידוע')
+
+                if r_key not in hierarchy:
+                    hierarchy[r_key] = {
+                        'name': r_name, 'level': 5, 'side': 'right',
+                        'budget': 0, 'paid': r_paid_thousands,
+                        'parent': l4_key
+                    }
+
+            # "Others" remainder
+            remainder = paid - recipients_sum_thousands
+            if remainder > 0.1:
+                others_count = paid_info.get('recipients', 0) - len(top_recipients)
+                others_label = f'אחרים ({others_count})' if others_count > 0 else 'אחרים'
+                others_key = f"R5_{code}_others"
+                if others_key not in hierarchy:
+                    hierarchy[others_key] = {
+                        'name': others_label, 'level': 5, 'side': 'right',
+                        'budget': 0, 'paid': remainder,
+                        'parent': l4_key
+                    }
+
+    # --- Add gap nodes to hierarchy ---
+    for g in gap_nodes:
+        hierarchy[g['key']] = {
+            'name': g['name'], 'level': g['level'], 'side': g['side'],
+            'budget': g['budget'], 'paid': g['paid'], 'gap': g['gap'],
+            'gap_type': g['gap_type'], 'parent_takana': g['parent_takana']
+        }
+
+    # --- Compute y positions for each level ---
+    from collections import defaultdict
+    by_level = defaultdict(list)
+    for key, data in hierarchy.items():
+        by_level[data['level']].append((key, data))
+
+    for level, items in by_level.items():
+        # Sort by paid amount for all levels (both sides = execution)
+        items.sort(key=lambda x: -(x[1].get('paid', 0) + x[1].get('gap', 0)))
+        total = sum(max(d.get('paid', 0), d.get('gap', 0)) for _, d in items)
+
+        if total <= 0:
+            for idx, (key, data) in enumerate(items):
+                data['y'] = (idx + 0.5) / max(len(items), 1)
+            continue
+
+        # Proportional y distribution
+        y_cursor = 0.001
+        pad = min(0.003, 0.9 / max(len(items), 1))
+
+        for key, data in items:
+            value = max(data.get('paid', 0), data.get('gap', 0))
+            height = max((value / total) * 0.95, 0.001)
+            data['y'] = min(y_cursor + height / 2, 0.999)
+            y_cursor += height + pad
+
+    # --- Build final nodes and links ---
+    nodes = []
+    links = []
+
+    for key, data in hierarchy.items():
+        level = data['level']
+        node = {
+            'id': key,
+            'name': data['name'],
+            'level': level,
+            'side': data['side'],
+            'budget': data.get('budget', 0),
+            'paid': data.get('paid', 0),
+            'x': X_POSITIONS.get(level, 0.5),
+            'y': data.get('y', 0.5)
+        }
+        if 'code' in data:
+            node['code'] = data['code']
+        if 'gap' in data:
+            node['gap'] = data['gap']
+            node['gap_type'] = data.get('gap_type', '')
+        nodes.append(node)
+
+        # Create links
+        if 'parent' in data:
+            # ALL hierarchy links (levels 1-5) use PAID as value
+            link_value = data.get('paid', 0)
+            if data['level'] <= 4:
+                link_side = 'left'
+            else:
+                link_side = 'right'
+
+            if link_value > 0:
+                links.append({
+                    'source': data['parent'],
+                    'target': key,
+                    'value': link_value,
+                    'side': link_side,
+                    'budget': data.get('budget', 0),
+                    'paid': data.get('paid', 0)
+                })
+
+        # Gap links: from TAKANA → GAP node (going left, shown as red)
+        if 'parent_takana' in data:
+            gap_val = data.get('gap', 0)
+            if gap_val > 0:
+                links.append({
+                    'source': data['parent_takana'],
+                    'target': key,
+                    'value': gap_val,
+                    'side': 'gap',
+                    'budget': data.get('budget', 0),
+                    'paid': data.get('paid', 0),
+                    'gap_type': data.get('gap_type', '')
+                })
+
+    # Sort nodes by level and value
+    nodes.sort(key=lambda x: (x['level'], -max(x.get('budget', 0), x.get('paid', 0), x.get('gap', 0))))
+
     return {
         'nodes': nodes,
         'links': links
@@ -611,6 +915,53 @@ def create_five_pillars_file(budget_data):
     return output_path
 
 
+def create_budget_rigidity_file(budget_data, commitment_data):
+    """יצירת קובץ HTML למד קשיחות התקציב"""
+
+    template_path = os.path.join(os.path.dirname(__file__), 'budget_rigidity_template.html')
+
+    if not os.path.exists(template_path):
+        print("  תבנית budget_rigidity_template.html לא נמצאה, מדלג...")
+        return None
+
+    with open(template_path, 'r', encoding='utf-8') as f:
+        html_template = f.read()
+
+    json_budget = json.dumps(budget_data, ensure_ascii=False)
+    json_commitments = json.dumps(commitment_data, ensure_ascii=False)
+
+    final_html = html_template.replace('__BUDGET_DATA_PLACEHOLDER__', json_budget)
+    final_html = final_html.replace('__COMMITMENT_DATA_PLACEHOLDER__', json_commitments)
+
+    output_path = os.path.join(os.path.dirname(__file__), 'budget_rigidity.html')
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(final_html)
+
+    return output_path
+
+
+def create_convergent_sankey_file(paid_supports_data):
+    """יצירת קובץ HTML לגרף סנקי מתכנס — תקציב ↔ תקנה ↔ עמותות"""
+
+    template_path = os.path.join(os.path.dirname(__file__), 'convergent_sankey_template.html')
+
+    if not os.path.exists(template_path):
+        print("  תבנית convergent_sankey_template.html לא נמצאה, מדלג...")
+        return None
+
+    with open(template_path, 'r', encoding='utf-8') as f:
+        html_template = f.read()
+
+    json_paid = json.dumps(paid_supports_data, ensure_ascii=False)
+    final_html = html_template.replace('__PAID_SUPPORTS_PLACEHOLDER__', json_paid)
+
+    output_path = os.path.join(os.path.dirname(__file__), 'convergent_sankey.html')
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(final_html)
+
+    return output_path
+
+
 def create_paid_supports_file(budget_data, paid_supports_data):
     """יצירת קובץ HTML לניתוח תמיכות ותקציב"""
 
@@ -643,7 +994,7 @@ def main():
     print("=" * 60)
 
     # טעינת נתונים
-    print("\n[1/9] טוען נתונים מכל השנים...")
+    print("\n[1/11] טוען נתונים מכל השנים...")
     budget_data, income_data, commitment_data = load_all_budget_data()
 
     print(f"\nנטענו נתונים ל-{len(budget_data)} שנים: {sorted(budget_data.keys())}")
@@ -665,52 +1016,67 @@ def main():
     print(f"  סה\"כ כל השנים: {commitment_grand_total:,.2f}")
 
     # טעינת נתוני תמיכות
-    print("\n[2/9] טוען נתוני תמיכות...")
+    print("\n[2/11] טוען נתוני תמיכות...")
     paid_supports_data = load_paid_supports_data(budget_data)
     if paid_supports_data:
         print(f"  נטענו נתוני תמיכות ל-{len(paid_supports_data)} שנים")
 
     # יצירת HTML ראשי
-    print("\n[3/9] יוצר קובץ HTML ראשי...")
+    print("\n[3/11] יוצר קובץ HTML ראשי...")
     output_path = create_html_file(budget_data, income_data, commitment_data)
     print(f"נשמר: {output_path}")
 
     # יצירת HTML להשוואה שנתית
-    print("\n[4/9] יוצר קובץ השוואה שנתית...")
+    print("\n[4/11] יוצר קובץ השוואה שנתית...")
     time_series_path = create_time_series_file(budget_data)
     if time_series_path:
         print(f"נשמר: {time_series_path}")
 
     # יצירת HTML לאחוזי שכר
-    print("\n[5/9] יוצר קובץ אחוזי שכר...")
+    print("\n[5/11] יוצר קובץ אחוזי שכר...")
     salary_path = create_salary_percentage_file(budget_data)
     if salary_path:
         print(f"נשמר: {salary_path}")
 
     # יצירת HTML לסקירת משרדים
-    print("\n[6/9] יוצר קובץ סקירת משרדים...")
+    print("\n[6/11] יוצר קובץ סקירת משרדים...")
     ministry_path = create_ministry_overview_file(budget_data)
     if ministry_path:
         print(f"נשמר: {ministry_path}")
 
     # יצירת HTML לתרשים Sunburst
-    print("\n[7/9] יוצר קובץ Sunburst...")
+    print("\n[7/11] יוצר קובץ Sunburst...")
     sunburst_path = create_sunburst_file(budget_data)
     if sunburst_path:
         print(f"נשמר: {sunburst_path}")
 
     # יצירת HTML ל-5 עמודי התקציב
-    print("\n[8/9] יוצר קובץ 5 עמודי התקציב...")
+    print("\n[8/11] יוצר קובץ 5 עמודי התקציב...")
     five_pillars_path = create_five_pillars_file(budget_data)
     if five_pillars_path:
         print(f"נשמר: {five_pillars_path}")
 
+    # יצירת HTML למד קשיחות
+    print("\n[9/11] יוצר קובץ מד קשיחות...")
+    rigidity_path = create_budget_rigidity_file(budget_data, commitment_data)
+    if rigidity_path:
+        print(f"נשמר: {rigidity_path}")
+
     # יצירת HTML לתמיכות ותקציב
-    print("\n[9/9] יוצר קובץ תמיכות ותקציב...")
+    print("\n[10/11] יוצר קובץ תמיכות ותקציב...")
     if paid_supports_data:
         paid_supports_path = create_paid_supports_file(budget_data, paid_supports_data)
         if paid_supports_path:
             print(f"נשמר: {paid_supports_path}")
+    else:
+        print("  דילוג - אין נתוני תמיכות")
+
+    # יצירת HTML לסנקי מתכנס
+    print("\n[11/11] יוצר קובץ סנקי מתכנס...")
+    if paid_supports_data:
+        convergent_path = create_convergent_sankey_file(paid_supports_data)
+        if convergent_path:
+            print(f"נשמר: {convergent_path}")
     else:
         print("  דילוג - אין נתוני תמיכות")
 

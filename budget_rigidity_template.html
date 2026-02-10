@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מד קשיחות | תקציב המדינה</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+            --accent-pink: #db61a2;
+            --rigid-red: #f85149;
+            --semi-rigid: #d29922;
+            --flexible-green: #3fb950;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --bg-tertiary: #f0f2f5;
+            --border-color: #d0d7de;
+            --text-primary: #1f2328;
+            --text-secondary: #656d76;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            right: 0;
+            top: 0;
+            height: 100vh;
+            width: 60px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 1000;
+            transition: width 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.expanded { width: 280px; }
+
+        .sidebar-toggle {
+            width: 100%;
+            padding: 20px;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 20px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-nav { padding: 10px 0; flex: 1; overflow-y: auto; }
+        .sidebar-nav-item { list-style: none; }
+
+        .sidebar-nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s;
+            gap: 15px;
+        }
+
+        .sidebar-nav-link:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+        .sidebar-nav-link.active { color: var(--accent-blue); background: rgba(88, 166, 255, 0.1); }
+
+        .sidebar-nav-icon { font-size: 20px; min-width: 24px; text-align: center; }
+        .sidebar-nav-text { display: none; }
+        .sidebar.expanded .sidebar-nav-text { display: block; }
+        .sidebar-nav-label { font-size: 14px; font-weight: 500; }
+        .sidebar-nav-desc { font-size: 11px; color: var(--text-secondary); }
+
+        /* Main content */
+        .main-content {
+            margin-right: 60px;
+            padding: 30px;
+            transition: margin-right 0.3s ease;
+        }
+        body.sidebar-expanded .main-content { margin-right: 280px; }
+
+        /* Header */
+        .page-header {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title { font-size: 28px; font-weight: 600; }
+        .page-subtitle { color: var(--text-secondary); font-size: 14px; margin-top: 5px; }
+
+        .controls { display: flex; gap: 15px; align-items: center; }
+
+        .year-select, .view-select {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .theme-toggle {
+            width: 40px; height: 40px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        /* Stats */
+        .stats-row {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-card.rigid { border-color: var(--rigid-red); border-width: 2px; }
+        .stat-card.semi { border-color: var(--semi-rigid); border-width: 2px; }
+        .stat-card.flexible { border-color: var(--flexible-green); border-width: 2px; }
+
+        .stat-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+        .stat-value { font-size: 28px; font-weight: 700; }
+        .stat-sub { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+        .stat-value.red { color: var(--rigid-red); }
+        .stat-value.orange { color: var(--semi-rigid); }
+        .stat-value.green { color: var(--flexible-green); }
+        .stat-value.blue { color: var(--accent-blue); }
+
+        /* Chart sections */
+        .chart-section {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chart-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            margin-right: 32px;
+        }
+
+        .chart-container { height: 500px; }
+        .chart-container.tall { height: 600px; }
+
+        /* Simulator section */
+        .simulator-section {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(88, 166, 255, 0.05) 100%);
+            border: 2px solid var(--accent-blue);
+            border-radius: 16px;
+            padding: 30px;
+        }
+
+        .simulator-title {
+            font-size: 22px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--accent-blue);
+            margin-bottom: 8px;
+        }
+
+        .simulator-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 25px;
+        }
+
+        .simulator-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .simulator-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .simulator-item {
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            padding: 14px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .simulator-item:hover { border-color: var(--border-color); }
+
+        .simulator-item.checked {
+            border-color: var(--accent-red);
+            background: rgba(248, 81, 73, 0.08);
+        }
+
+        .simulator-item-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .simulator-checkbox {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent-red);
+            cursor: pointer;
+        }
+
+        .simulator-item-name { font-weight: 500; font-size: 14px; }
+
+        .simulator-item-values {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .simulator-item-total { color: var(--text-secondary); }
+        .simulator-item-rigid { color: var(--rigid-red); font-weight: 600; }
+        .simulator-item-flexible { color: var(--flexible-green); font-weight: 600; }
+
+        .simulator-result {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .result-card {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .result-card-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+        .result-card-value { font-size: 32px; font-weight: 700; }
+        .result-card-sub { font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
+
+        .result-chart { height: 300px; }
+
+        /* Legend bar */
+        .legend-bar {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            display: flex;
+            gap: 0;
+            border-radius: 12px;
+            overflow: hidden;
+            height: 50px;
+        }
+
+        .legend-bar-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: white;
+            transition: all 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebarToggle" title="הרחב/כווץ תפריט">&#9776;</button>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item">
+                <a href="budget_interactive.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9641;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">תקציב המדינה</div>
+                        <div class="sidebar-nav-desc">תצוגה היררכית</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="time_series.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#128200;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">השוואה שנתית</div>
+                        <div class="sidebar-nav-desc">מגמות לאורך זמן</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="salary_percentage.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#8362;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">אחוזי שכר</div>
+                        <div class="sidebar-nav-desc">גמישות תקציבית</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="ministry_overview.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9962;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">סקירת משרדים</div>
+                        <div class="sidebar-nav-desc">השוואה בין משרדים</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="sunburst_budget.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9788;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">Sunburst</div>
+                        <div class="sidebar-nav-desc">תרשים שמש היררכי</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="five_pillars.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9733;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">5 עמודי התקציב</div>
+                        <div class="sidebar-nav-desc">ניתוח הוצאות ליבה</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="paid_supports.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#128176;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">תמיכות ותקציב</div>
+                        <div class="sidebar-nav-desc">ביצוע מול תקציב</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="convergent_sankey.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#8644;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">סנקי מתכנס</div>
+                        <div class="sidebar-nav-desc">תקציב ↔ תקנה ↔ עמותות</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="budget_rigidity.html" class="sidebar-nav-link active">
+                    <span class="sidebar-nav-icon">&#128274;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">מד קשיחות</div>
+                        <div class="sidebar-nav-desc">גמישות תקציבית</div>
+                    </div>
+                </a>
+            </li>
+        </ul>
+    </aside>
+
+    <div class="main-content">
+        <!-- Header -->
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">&#128274; מד קשיחות התקציב</h1>
+                <p class="page-subtitle">כמה מהתקציב ניתן לשנות? ניתוח שכר, התחייבויות וגמישות</p>
+            </div>
+            <div class="controls">
+                <select class="year-select" id="yearSelect"></select>
+                <button class="theme-toggle" id="themeToggle" title="החלף מצב תצוגה">&#9790;</button>
+            </div>
+        </div>
+
+        <!-- Visual rigidity bar -->
+        <div class="legend-bar" id="rigidityBar"></div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-label">סה"כ תקציב</div>
+                <div class="stat-value blue" id="totalBudget">--</div>
+            </div>
+            <div class="stat-card rigid">
+                <div class="stat-label">&#128308; קשיח (שכר + פנסיה + ריבית)</div>
+                <div class="stat-value red" id="rigidTotal">--</div>
+                <div class="stat-sub" id="rigidPct">--</div>
+            </div>
+            <div class="stat-card semi">
+                <div class="stat-label">&#128992; חצי-קשיח (התחייבויות + הסכמים)</div>
+                <div class="stat-value orange" id="semiTotal">--</div>
+                <div class="stat-sub" id="semiPct">--</div>
+            </div>
+            <div class="stat-card flexible">
+                <div class="stat-label">&#128994; גמיש (השארית)</div>
+                <div class="stat-value green" id="flexTotal">--</div>
+                <div class="stat-sub" id="flexPct">--</div>
+            </div>
+        </div>
+
+        <!-- Waterfall chart -->
+        <div class="chart-section">
+            <div class="chart-title">
+                <span>&#128202;</span>
+                Waterfall — מ-100% תקציב עד "מה שנשאר"
+            </div>
+            <div class="chart-subtitle">מתחילים מסך התקציב ומורידים שכבה-שכבה את ההוצאות הקשיחות</div>
+            <div class="chart-container" id="waterfallChart"></div>
+        </div>
+
+        <!-- Stacked bar over years -->
+        <div class="chart-section">
+            <div class="chart-title">
+                <span>&#128200;</span>
+                קשיחות לאורך השנים
+            </div>
+            <div class="chart-subtitle">האם הגמישות התקציבית עולה או יורדת?</div>
+            <div class="chart-container" id="stackedChart"></div>
+        </div>
+
+        <!-- Rigidity by ministry -->
+        <div class="chart-section">
+            <div class="chart-title">
+                <span>&#9962;</span>
+                קשיחות לפי תחום (רמה 1)
+            </div>
+            <div class="chart-subtitle">אחוז שכר + התחייבויות מתוך התקציב של כל תחום</div>
+            <div class="chart-container tall" id="ministryRigidityChart"></div>
+        </div>
+
+        <!-- Budget Simulator -->
+        <div class="simulator-section">
+            <div class="simulator-title">
+                <span>&#127918;</span>
+                סימולטור תקציב — "מה אם?"
+            </div>
+            <div class="simulator-subtitle">
+                סמן תחומים שברצונך "לבטל" מהתקציב — וראה כמה באמת ניתן לחסוך (אחרי הורדת שכר והתחייבויות)
+            </div>
+            <div class="simulator-grid">
+                <div class="simulator-controls" id="simulatorItems"></div>
+                <div class="simulator-result">
+                    <div class="result-card">
+                        <div class="result-card-label">סה"כ תקציב מסומן לביטול</div>
+                        <div class="result-card-value red" id="simTotalMarked">0</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-card-label">&#128308; מתוכו קשיח (לא ניתן לחתוך)</div>
+                        <div class="result-card-value orange" id="simRigidPart">0</div>
+                        <div class="result-card-sub" id="simRigidPctText">--</div>
+                    </div>
+                    <div class="result-card" style="border: 2px solid var(--flexible-green);">
+                        <div class="result-card-label">&#128994; חיסכון אמיתי אפשרי</div>
+                        <div class="result-card-value green" id="simFlexPart">0</div>
+                        <div class="result-card-sub" id="simFlexPctText">--</div>
+                    </div>
+                    <div class="result-chart" id="simDonutChart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BUDGET_DATA = __BUDGET_DATA_PLACEHOLDER__;
+        const COMMITMENT_DATA = __COMMITMENT_DATA_PLACEHOLDER__;
+
+        const state = {
+            currentYear: 2024,
+            simulatorChecked: new Set()
+        };
+
+        // ============================================
+        // CLASSIFICATION LOGIC
+        // ============================================
+
+        function classifyBudget(data, commitmentData) {
+            const result = {
+                total: 0,
+                rigid: { salary: 0, pension: 0, interest: 0, total: 0 },
+                semi: { commitments: 0, nationalInsurance: 0, total: 0 },
+                flexible: { total: 0 },
+                byRama1: {}
+            };
+
+            // Process budget items
+            data.forEach(item => {
+                const value = item.value;
+                result.total += value;
+
+                const rama1 = item.path[0] || 'לא מוגדר';
+                const rama2 = item.path[1] || '';
+
+                if (!result.byRama1[rama1]) {
+                    result.byRama1[rama1] = {
+                        total: 0, salary: 0, pension: 0, interest: 0,
+                        commitments: 0, nationalInsurance: 0, flexible: 0
+                    };
+                }
+                result.byRama1[rama1].total += value;
+
+                // 1. Rigid: Salary
+                if (item.isSalary || item.miunRama1 === 'שכר') {
+                    result.rigid.salary += value;
+                    result.byRama1[rama1].salary += value;
+                }
+                // 2. Rigid: Interest on debt
+                else if (rama1 === 'החזרי חוב' && rama2 === 'ריבית') {
+                    result.rigid.interest += value;
+                    result.byRama1[rama1].interest += value;
+                }
+                // 3. Rigid: Pension
+                else if (rama2 && (rama2.includes('פנסי') || rama2.includes('גימלאות'))) {
+                    result.rigid.pension += value;
+                    result.byRama1[rama1].pension += value;
+                }
+                // 4. Semi-rigid: National Insurance
+                else if (rama1 === 'שירותים חברתיים' && rama2 && rama2.includes('ביטוח לאומי')) {
+                    result.semi.nationalInsurance += value;
+                    result.byRama1[rama1].nationalInsurance += value;
+                }
+                // 5. Flexible: everything else
+                else {
+                    result.byRama1[rama1].flexible += value;
+                }
+            });
+
+            // Process commitment data
+            if (commitmentData && commitmentData.length > 0) {
+                // Commitments that are NOT salary (salary is already counted as rigid)
+                commitmentData.forEach(item => {
+                    result.semi.commitments += Math.abs(item.value);
+                });
+            }
+
+            // Calculate totals
+            result.rigid.total = result.rigid.salary + result.rigid.pension + result.rigid.interest;
+            result.semi.total = result.semi.commitments + result.semi.nationalInsurance;
+
+            // Cap semi to prevent overlap: semi can't exceed total - rigid
+            const maxSemi = result.total - result.rigid.total;
+            if (result.semi.total > maxSemi) {
+                result.semi.total = maxSemi;
+            }
+
+            result.flexible.total = Math.max(0, result.total - result.rigid.total - result.semi.total);
+
+            return result;
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+
+        function init() {
+            const yearSelect = document.getElementById('yearSelect');
+            const years = Object.keys(BUDGET_DATA).map(Number).sort((a, b) => b - a);
+            years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
+            yearSelect.addEventListener('change', (e) => {
+                state.currentYear = parseInt(e.target.value);
+                state.simulatorChecked.clear();
+                updateView();
+            });
+
+            initTheme();
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+            initSidebar();
+            document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
+
+            updateView();
+        }
+
+        // ============================================
+        // UPDATE VIEW
+        // ============================================
+
+        function updateView() {
+            const data = BUDGET_DATA[state.currentYear];
+            const commitments = COMMITMENT_DATA[state.currentYear] || [];
+            if (!data) return;
+
+            const classified = classifyBudget(data, commitments);
+
+            updateStats(classified);
+            drawRigidityBar(classified);
+            drawWaterfall(classified);
+            drawStackedYears();
+            drawMinistryRigidity(classified);
+            buildSimulator(classified, data);
+        }
+
+        // ============================================
+        // STATS
+        // ============================================
+
+        function updateStats(c) {
+            document.getElementById('totalBudget').textContent = formatBillions(c.total) + 'B ₪';
+            document.getElementById('rigidTotal').textContent = formatBillions(c.rigid.total) + 'B ₪';
+            document.getElementById('rigidPct').textContent = (c.rigid.total / c.total * 100).toFixed(1) + '% מהתקציב';
+            document.getElementById('semiTotal').textContent = formatBillions(c.semi.total) + 'B ₪';
+            document.getElementById('semiPct').textContent = (c.semi.total / c.total * 100).toFixed(1) + '% מהתקציב';
+            document.getElementById('flexTotal').textContent = formatBillions(c.flexible.total) + 'B ₪';
+            document.getElementById('flexPct').textContent = (c.flexible.total / c.total * 100).toFixed(1) + '% מהתקציב — זה מה שאפשר לשנות';
+        }
+
+        // ============================================
+        // RIGIDITY BAR
+        // ============================================
+
+        function drawRigidityBar(c) {
+            const bar = document.getElementById('rigidityBar');
+            const rigidPct = (c.rigid.total / c.total * 100);
+            const semiPct = (c.semi.total / c.total * 100);
+            const flexPct = (c.flexible.total / c.total * 100);
+
+            bar.innerHTML = `
+                <div class="legend-bar-segment" style="width:${rigidPct}%;background:var(--rigid-red);">
+                    &#128308; קשיח ${rigidPct.toFixed(0)}%
+                </div>
+                <div class="legend-bar-segment" style="width:${semiPct}%;background:var(--semi-rigid);">
+                    &#128992; חצי-קשיח ${semiPct.toFixed(0)}%
+                </div>
+                <div class="legend-bar-segment" style="width:${flexPct}%;background:var(--flexible-green);">
+                    &#128994; גמיש ${flexPct.toFixed(0)}%
+                </div>
+            `;
+        }
+
+        // ============================================
+        // WATERFALL CHART
+        // ============================================
+
+        function drawWaterfall(c) {
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            const textColor = isDark ? '#e6edf3' : '#1f2328';
+            const bgColor = isDark ? '#161b22' : '#f6f8fa';
+
+            const trace = {
+                type: 'waterfall',
+                orientation: 'v',
+                measure: ['absolute', 'relative', 'relative', 'relative', 'relative', 'total'],
+                x: [
+                    'סה"כ תקציב',
+                    'שכר',
+                    'פנסיה + גימלאות',
+                    'ריבית על חוב',
+                    'התחייבויות + בט"ל',
+                    'שארית גמישה'
+                ],
+                y: [
+                    c.total,
+                    -c.rigid.salary,
+                    -c.rigid.pension,
+                    -c.rigid.interest,
+                    -c.semi.total,
+                    0
+                ],
+                text: [
+                    formatBillions(c.total) + 'B',
+                    '-' + formatBillions(c.rigid.salary) + 'B',
+                    '-' + formatBillions(c.rigid.pension) + 'B',
+                    '-' + formatBillions(c.rigid.interest) + 'B',
+                    '-' + formatBillions(c.semi.total) + 'B',
+                    formatBillions(c.flexible.total) + 'B'
+                ],
+                textposition: 'outside',
+                textfont: { color: textColor, size: 14, family: 'Heebo, sans-serif' },
+                connector: { line: { color: isDark ? '#30363d' : '#d0d7de', width: 2 } },
+                decreasing: { marker: { color: '#f85149' } },
+                increasing: { marker: { color: '#3fb950' } },
+                totals: { marker: { color: '#3fb950' } }
+            };
+
+            const layout = {
+                paper_bgcolor: bgColor,
+                plot_bgcolor: bgColor,
+                font: { family: 'Heebo, sans-serif', color: textColor },
+                margin: { t: 30, b: 80, l: 80, r: 30 },
+                yaxis: {
+                    title: 'אלפי ש"ח',
+                    gridcolor: isDark ? '#21262d' : '#eaeef2'
+                },
+                xaxis: {
+                    tickfont: { size: 13 }
+                },
+                showlegend: false
+            };
+
+            Plotly.newPlot('waterfallChart', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        // ============================================
+        // STACKED BAR OVER YEARS
+        // ============================================
+
+        function drawStackedYears() {
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            const textColor = isDark ? '#e6edf3' : '#1f2328';
+            const bgColor = isDark ? '#161b22' : '#f6f8fa';
+
+            const years = Object.keys(BUDGET_DATA).map(Number).sort();
+            const rigidPcts = [];
+            const semiPcts = [];
+            const flexPcts = [];
+
+            years.forEach(year => {
+                const data = BUDGET_DATA[year];
+                const commitments = COMMITMENT_DATA[year] || [];
+                const c = classifyBudget(data, commitments);
+                rigidPcts.push((c.rigid.total / c.total * 100));
+                semiPcts.push((c.semi.total / c.total * 100));
+                flexPcts.push((c.flexible.total / c.total * 100));
+            });
+
+            const traces = [
+                {
+                    name: 'קשיח (שכר+פנסיה+ריבית)',
+                    x: years,
+                    y: rigidPcts,
+                    type: 'bar',
+                    marker: { color: '#f85149' },
+                    hovertemplate: '%{x}: %{y:.1f}%<extra>קשיח</extra>'
+                },
+                {
+                    name: 'חצי-קשיח (התחייבויות)',
+                    x: years,
+                    y: semiPcts,
+                    type: 'bar',
+                    marker: { color: '#d29922' },
+                    hovertemplate: '%{x}: %{y:.1f}%<extra>חצי-קשיח</extra>'
+                },
+                {
+                    name: 'גמיש (שארית)',
+                    x: years,
+                    y: flexPcts,
+                    type: 'bar',
+                    marker: { color: '#3fb950' },
+                    hovertemplate: '%{x}: %{y:.1f}%<extra>גמיש</extra>'
+                }
+            ];
+
+            const layout = {
+                barmode: 'stack',
+                paper_bgcolor: bgColor,
+                plot_bgcolor: bgColor,
+                font: { family: 'Heebo, sans-serif', color: textColor },
+                margin: { t: 30, b: 50, l: 60, r: 30 },
+                yaxis: {
+                    title: '% מהתקציב',
+                    range: [0, 100],
+                    gridcolor: isDark ? '#21262d' : '#eaeef2'
+                },
+                xaxis: { dtick: 1 },
+                legend: {
+                    orientation: 'h',
+                    y: -0.15,
+                    x: 0.5,
+                    xanchor: 'center',
+                    font: { size: 12 }
+                }
+            };
+
+            Plotly.newPlot('stackedChart', traces, layout, { responsive: true, displayModeBar: false });
+        }
+
+        // ============================================
+        // MINISTRY RIGIDITY
+        // ============================================
+
+        function drawMinistryRigidity(c) {
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            const textColor = isDark ? '#e6edf3' : '#1f2328';
+            const bgColor = isDark ? '#161b22' : '#f6f8fa';
+
+            // Sort by total budget descending, take top 12
+            const sorted = Object.entries(c.byRama1)
+                .sort((a, b) => b[1].total - a[1].total)
+                .slice(0, 12);
+
+            const names = sorted.map(([name]) => name);
+            const salaryPcts = sorted.map(([_, d]) => d.total > 0 ? (d.salary / d.total * 100) : 0);
+            const pensionPcts = sorted.map(([_, d]) => d.total > 0 ? (d.pension / d.total * 100) : 0);
+            const interestPcts = sorted.map(([_, d]) => d.total > 0 ? (d.interest / d.total * 100) : 0);
+            const niPcts = sorted.map(([_, d]) => d.total > 0 ? (d.nationalInsurance / d.total * 100) : 0);
+            const flexPcts = sorted.map(([_, d]) => d.total > 0 ? (d.flexible / d.total * 100) : 0);
+
+            const traces = [
+                { name: 'שכר', y: names, x: salaryPcts, type: 'bar', orientation: 'h', marker: { color: '#f85149' } },
+                { name: 'פנסיה', y: names, x: pensionPcts, type: 'bar', orientation: 'h', marker: { color: '#da3633' } },
+                { name: 'ריבית', y: names, x: interestPcts, type: 'bar', orientation: 'h', marker: { color: '#bd2c2c' } },
+                { name: 'ביטוח לאומי', y: names, x: niPcts, type: 'bar', orientation: 'h', marker: { color: '#d29922' } },
+                { name: 'גמיש', y: names, x: flexPcts, type: 'bar', orientation: 'h', marker: { color: '#3fb950' } },
+            ];
+
+            const layout = {
+                barmode: 'stack',
+                paper_bgcolor: bgColor,
+                plot_bgcolor: bgColor,
+                font: { family: 'Heebo, sans-serif', color: textColor, size: 12 },
+                margin: { t: 10, b: 50, l: 160, r: 30 },
+                xaxis: {
+                    title: '% מהתקציב',
+                    range: [0, 100],
+                    gridcolor: isDark ? '#21262d' : '#eaeef2'
+                },
+                yaxis: { automargin: true },
+                legend: {
+                    orientation: 'h',
+                    y: -0.15,
+                    x: 0.5,
+                    xanchor: 'center'
+                }
+            };
+
+            Plotly.newPlot('ministryRigidityChart', traces, layout, { responsive: true, displayModeBar: false });
+        }
+
+        // ============================================
+        // SIMULATOR
+        // ============================================
+
+        function buildSimulator(classified, data) {
+            const container = document.getElementById('simulatorItems');
+            const sorted = Object.entries(classified.byRama1)
+                .sort((a, b) => b[1].total - a[1].total);
+
+            container.innerHTML = sorted.map(([name, d]) => {
+                const rigidAmount = d.salary + d.pension + d.interest + d.nationalInsurance;
+                const flexAmount = d.flexible;
+                const isChecked = state.simulatorChecked.has(name);
+                return `
+                    <div class="simulator-item ${isChecked ? 'checked' : ''}" data-name="${name}">
+                        <div class="simulator-item-info">
+                            <input type="checkbox" class="simulator-checkbox"
+                                ${isChecked ? 'checked' : ''}
+                                onchange="toggleSimulator('${name}', this.checked)">
+                            <span class="simulator-item-name">${name}</span>
+                        </div>
+                        <div class="simulator-item-values">
+                            <span class="simulator-item-total">${formatBillions(d.total)}B</span>
+                            <span class="simulator-item-rigid">&#128308; ${formatBillions(rigidAmount)}B</span>
+                            <span class="simulator-item-flexible">&#128994; ${formatBillions(flexAmount)}B</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            updateSimulatorResult(classified);
+        }
+
+        function toggleSimulator(name, checked) {
+            if (checked) {
+                state.simulatorChecked.add(name);
+            } else {
+                state.simulatorChecked.delete(name);
+            }
+
+            // Update visual state
+            document.querySelectorAll('.simulator-item').forEach(el => {
+                if (el.dataset.name === name) {
+                    el.classList.toggle('checked', checked);
+                }
+            });
+
+            const data = BUDGET_DATA[state.currentYear];
+            const commitments = COMMITMENT_DATA[state.currentYear] || [];
+            const classified = classifyBudget(data, commitments);
+            updateSimulatorResult(classified);
+        }
+
+        function updateSimulatorResult(classified) {
+            let totalMarked = 0;
+            let rigidPart = 0;
+            let flexPart = 0;
+
+            state.simulatorChecked.forEach(name => {
+                const d = classified.byRama1[name];
+                if (d) {
+                    totalMarked += d.total;
+                    rigidPart += d.salary + d.pension + d.interest + d.nationalInsurance;
+                    flexPart += d.flexible;
+                }
+            });
+
+            document.getElementById('simTotalMarked').textContent = formatBillions(totalMarked) + 'B ₪';
+            document.getElementById('simRigidPart').textContent = formatBillions(rigidPart) + 'B ₪';
+            document.getElementById('simFlexPart').textContent = formatBillions(flexPart) + 'B ₪';
+
+            const rigidPctText = totalMarked > 0 ? (rigidPart / totalMarked * 100).toFixed(1) + '% מהסכום הנבחר הוא קשיח' : '--';
+            const flexPctText = totalMarked > 0 ? (flexPart / totalMarked * 100).toFixed(1) + '% מהסכום הנבחר ניתן לחיסכון' : '--';
+            document.getElementById('simRigidPctText').textContent = rigidPctText;
+            document.getElementById('simFlexPctText').textContent = flexPctText;
+
+            // Draw donut
+            drawSimDonut(totalMarked, rigidPart, flexPart);
+        }
+
+        function drawSimDonut(total, rigid, flex) {
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            const textColor = isDark ? '#e6edf3' : '#1f2328';
+            const bgColor = isDark ? '#161b22' : '#f6f8fa';
+
+            if (total === 0) {
+                Plotly.newPlot('simDonutChart', [], {
+                    paper_bgcolor: bgColor,
+                    annotations: [{
+                        text: 'סמן תחומים בצד שמאל',
+                        showarrow: false,
+                        font: { size: 16, color: textColor, family: 'Heebo, sans-serif' }
+                    }],
+                    margin: { t: 20, b: 20, l: 20, r: 20 }
+                }, { responsive: true, displayModeBar: false });
+                return;
+            }
+
+            const trace = {
+                type: 'pie',
+                values: [rigid, flex],
+                labels: ['קשיח (לא ניתן לחתוך)', 'גמיש (חיסכון אפשרי)'],
+                hole: 0.55,
+                marker: { colors: ['#f85149', '#3fb950'] },
+                textinfo: 'label+percent',
+                textfont: { size: 13, family: 'Heebo, sans-serif', color: '#fff' },
+                hovertemplate: '%{label}<br>%{value:,.0f} אלפי ₪<br>%{percent}<extra></extra>'
+            };
+
+            const layout = {
+                paper_bgcolor: bgColor,
+                font: { family: 'Heebo, sans-serif', color: textColor },
+                margin: { t: 20, b: 20, l: 20, r: 20 },
+                showlegend: false,
+                annotations: [{
+                    text: formatBillions(total) + 'B',
+                    showarrow: false,
+                    font: { size: 22, color: textColor, family: 'Heebo, sans-serif' }
+                }]
+            };
+
+            Plotly.newPlot('simDonutChart', [trace], layout, { responsive: true, displayModeBar: false });
+        }
+
+        // ============================================
+        // UTILITIES
+        // ============================================
+
+        function formatBillions(value) {
+            return (value / 1e6).toFixed(1);
+        }
+
+        // Theme
+        function initTheme() {
+            const savedTheme = localStorage.getItem('budget-theme') || 'dark';
+            applyTheme(savedTheme);
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = current === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('budget-theme', newTheme);
+            applyTheme(newTheme);
+            updateView();
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('themeToggle').innerHTML = theme === 'dark' ? '&#9790;' : '&#9788;';
+        }
+
+        // Sidebar
+        function initSidebar() {
+            const savedState = localStorage.getItem('sidebar-expanded');
+            if (savedState === 'true') {
+                document.getElementById('sidebar').classList.add('expanded');
+                document.body.classList.add('sidebar-expanded');
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('expanded');
+            document.body.classList.toggle('sidebar-expanded');
+            localStorage.setItem('sidebar-expanded', sidebar.classList.contains('expanded'));
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

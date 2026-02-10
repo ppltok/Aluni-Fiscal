@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>סנקי מתכנס | ויזואליזציה</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+            --accent-pink: #db61a2;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --bg-tertiary: #f0f2f5;
+            --border-color: #d0d7de;
+            --text-primary: #1f2328;
+            --text-secondary: #656d76;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            right: 0;
+            top: 0;
+            height: 100vh;
+            width: 60px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            z-index: 1000;
+            transition: width 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.expanded { width: 280px; }
+
+        .sidebar-toggle {
+            width: 100%;
+            padding: 20px;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 20px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-nav { padding: 10px 0; flex: 1; overflow-y: auto; }
+
+        .sidebar-nav-item { list-style: none; }
+
+        .sidebar-nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s;
+            gap: 15px;
+        }
+
+        .sidebar-nav-link:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .sidebar-nav-link.active {
+            color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+        }
+
+        .sidebar-nav-icon { font-size: 20px; min-width: 24px; text-align: center; }
+
+        .sidebar-nav-text { display: none; }
+        .sidebar.expanded .sidebar-nav-text { display: block; }
+
+        .sidebar-nav-label { font-size: 14px; font-weight: 500; }
+        .sidebar-nav-desc { font-size: 11px; color: var(--text-secondary); }
+
+        /* Main content */
+        .main-content {
+            margin-right: 60px;
+            padding: 30px;
+            transition: margin-right 0.3s ease;
+        }
+
+        body.sidebar-expanded .main-content { margin-right: 280px; }
+
+        /* Header */
+        .page-header {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .page-subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .year-select {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .theme-toggle {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        /* Stats cards */
+        .stats-row {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .stat-value.blue { color: var(--accent-blue); }
+        .stat-value.green { color: var(--accent-green); }
+        .stat-value.red { color: var(--accent-red); }
+        .stat-value.orange { color: var(--accent-orange); }
+        .stat-value.purple { color: var(--accent-purple); }
+
+        /* Sankey flow section */
+        .sankey-section {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .sankey-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .sankey-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .depth-select {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-family: 'Heebo', sans-serif;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .sankey-container {
+            height: 800px;
+            transition: height 0.3s ease;
+        }
+
+        .sankey-legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .sankey-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .sankey-legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .sankey-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+            min-height: 36px;
+        }
+
+        .sankey-breadcrumb-btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
+            color: var(--accent-blue);
+            font-family: 'Heebo', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sankey-breadcrumb-btn:hover {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .sankey-focus-label {
+            font-size: 14px;
+            color: var(--accent-orange);
+            font-weight: 600;
+        }
+
+        .sankey-focus-hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Explanation section */
+        .explanation-section {
+            max-width: 1600px;
+            margin: 0 auto 30px;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(88, 166, 255, 0.05) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+        }
+
+        .explanation-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--accent-blue);
+        }
+
+        .explanation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        .explanation-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .explanation-icon {
+            font-size: 20px;
+            min-width: 28px;
+            text-align: center;
+        }
+
+        /* D3 Sankey styles */
+        .sankey-svg { width: 100%; display: block; }
+        .sankey-link { fill: none; transition: stroke-opacity 0.2s ease; }
+        .sankey-node rect { transition: opacity 0.2s ease; cursor: pointer; }
+        .sankey-node text { font-family: 'Heebo', sans-serif; pointer-events: none; }
+        .sankey-column-label { font-family: 'Heebo', sans-serif; font-weight: 600; font-size: 13px; }
+
+        .sankey-tooltip {
+            position: fixed;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px 18px;
+            font-size: 13px;
+            line-height: 1.7;
+            pointer-events: none;
+            z-index: 1000;
+            direction: rtl;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            max-width: 320px;
+        }
+        .sankey-tooltip.visible { opacity: 1; }
+        .sankey-tooltip b { color: var(--text-primary); }
+        .sankey-tooltip .tt-label { color: var(--text-secondary); }
+        .sankey-tooltip .tt-value { font-weight: 600; }
+        .sankey-tooltip .tt-gap { color: var(--accent-red); font-weight: 600; }
+        .sankey-tooltip .tt-divider { border-top: 1px solid var(--border-color); margin: 6px 0; }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebarToggle" title="הרחב/כווץ תפריט">&#9776;</button>
+        <ul class="sidebar-nav">
+            <li class="sidebar-nav-item">
+                <a href="budget_interactive.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9641;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">תקציב המדינה</div>
+                        <div class="sidebar-nav-desc">תצוגה היררכית</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="time_series.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#128200;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">השוואה שנתית</div>
+                        <div class="sidebar-nav-desc">מגמות לאורך זמן</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="salary_percentage.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#8362;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">אחוזי שכר</div>
+                        <div class="sidebar-nav-desc">גמישות תקציבית</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="ministry_overview.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9962;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">סקירת משרדים</div>
+                        <div class="sidebar-nav-desc">השוואה בין משרדים</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="sunburst_budget.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9788;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">Sunburst</div>
+                        <div class="sidebar-nav-desc">תרשים שמש היררכי</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="five_pillars.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#9733;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">5 עמודי התקציב</div>
+                        <div class="sidebar-nav-desc">ניתוח הוצאות ליבה</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="paid_supports.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#128176;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">תמיכות ותקציב</div>
+                        <div class="sidebar-nav-desc">ביצוע מול תקציב</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="convergent_sankey.html" class="sidebar-nav-link active">
+                    <span class="sidebar-nav-icon">&#8644;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">מבחני תמיכה</div>
+                        <div class="sidebar-nav-desc">מקבלים → תקנה → תקציב</div>
+                    </div>
+                </a>
+            </li>
+            <li class="sidebar-nav-item">
+                <a href="budget_rigidity.html" class="sidebar-nav-link">
+                    <span class="sidebar-nav-icon">&#128274;</span>
+                    <div class="sidebar-nav-text">
+                        <div class="sidebar-nav-label">מד קשיחות</div>
+                        <div class="sidebar-nav-desc">גמישות תקציבית</div>
+                    </div>
+                </a>
+            </li>
+        </ul>
+    </aside>
+
+    <div class="main-content">
+        <!-- Header -->
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">מבחני תמיכה — מי קיבל כסף ומאיפה?</h1>
+                <p class="page-subtitle">גרף זרימה: ממקבלי התמיכות דרך התקנה ועד להיררכיה התקציבית</p>
+            </div>
+            <div class="controls">
+                <select class="year-select" id="yearSelect"></select>
+                <button class="theme-toggle" id="themeToggle" title="החלף מצב תצוגה">&#9790;</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-label">תקציב מוקצה</div>
+                <div class="stat-value blue" id="totalBudget">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">שולם בפועל (ביצוע)</div>
+                <div class="stat-value green" id="totalPaid">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">אחוז ניצול</div>
+                <div class="stat-value purple" id="utilizationRate">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">תקנות פעילות</div>
+                <div class="stat-value orange" id="takanaCount">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">מקבלי תמיכות</div>
+                <div class="stat-value purple" id="recipientCount">--</div>
+            </div>
+        </div>
+
+        <!-- Explanation -->
+        <div class="explanation-section">
+            <div class="explanation-title">
+                <span>&#128161;</span>
+                איך לקרוא את הגרף
+            </div>
+            <div class="explanation-grid">
+                <div class="explanation-item">
+                    <span class="explanation-icon" style="color:#db61a2;">&#9654;</span>
+                    <div><b>צד ימין (ורוד):</b> מקבלי תמיכות — העמותות והגופים שקיבלו כספים בפועל. הם נקודת ההתחלה של הסיפור.</div>
+                </div>
+                <div class="explanation-item">
+                    <span class="explanation-icon" style="color:#d29922;">&#9724;</span>
+                    <div><b>תקנה (כתום):</b> קוד 8 ספרות — מבחן התמיכה שדרכו זרם הכסף מהמדינה למקבל.</div>
+                </div>
+                <div class="explanation-item">
+                    <span class="explanation-icon" style="color:#56d4dd;">&#9664;</span>
+                    <div><b>סעיף (תכלת):</b> הסעיף התקציבי שאליו שייכת התקנה.</div>
+                </div>
+                <div class="explanation-item">
+                    <span class="explanation-icon" style="color:#58a6ff;">&#9664;</span>
+                    <div><b>צד שמאל (כחול):</b> תחום ותת-תחום — המשרד והיחידה שאחראים על התקציב.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tooltip -->
+        <div class="sankey-tooltip" id="sankeyTooltip"></div>
+
+        <!-- Convergent Sankey Chart -->
+        <div class="sankey-section">
+            <div class="sankey-header">
+                <div class="chart-title">
+                    <span>&#8644;</span>
+                    זרימת תמיכות — ממקבלים לתקציב
+                </div>
+                <div class="sankey-controls">
+                    <label style="font-size:13px;color:var(--text-secondary);">מינימום:</label>
+                    <select class="depth-select" id="sankeyMinValue">
+                        <option value="10000">10M+ &#8362;</option>
+                        <option value="50000" selected>50M+ &#8362;</option>
+                        <option value="100000">100M+ &#8362;</option>
+                        <option value="500000">500M+ &#8362;</option>
+                    </select>
+                </div>
+            </div>
+            <div class="sankey-breadcrumb" id="sankeyBreadcrumb"></div>
+            <div class="sankey-container" id="sankeyFlowChart"></div>
+            <div class="sankey-focus-hint" id="sankeyHint">&#128073; לחץ על צומת כדי להתמקד בענף שלו בלבד. לחץ שוב לאיפוס.</div>
+            <div class="sankey-legend" id="sankeyLegendConvergent">
+                <div class="sankey-legend-item"><span class="sankey-legend-dot" style="background:#58a6ff;"></span> תחום</div>
+                <div class="sankey-legend-item"><span class="sankey-legend-dot" style="background:#79c0ff;"></span> תת-תחום</div>
+                <div class="sankey-legend-item"><span class="sankey-legend-dot" style="background:#56d4dd;"></span> סעיף</div>
+                <div class="sankey-legend-item"><span class="sankey-legend-dot" style="background:#d29922;font-weight:700;"></span> <b>תקנה</b></div>
+                <div class="sankey-legend-item"><span class="sankey-legend-dot" style="background:#db61a2;"></span> מקבלי תמיכות</div>
+                <div class="sankey-legend-item" style="margin-right:20px;"><span style="width:30px;height:4px;background:rgba(88,166,255,0.6);display:inline-block;vertical-align:middle;border-radius:2px;"></span> היררכיה תקציבית</div>
+                <div class="sankey-legend-item"><span style="width:30px;height:4px;background:rgba(63,185,80,0.6);display:inline-block;vertical-align:middle;border-radius:2px;"></span> תקנה → מקבלים</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data placeholders - will be replaced by Python
+        const PAID_SUPPORTS_DATA = __PAID_SUPPORTS_PLACEHOLDER__;
+
+        const state = {
+            currentYear: 2024,
+            sankeyFocusNode: null
+        };
+
+        // Initialize
+        function init() {
+            // Populate year select
+            const yearSelect = document.getElementById('yearSelect');
+            const years = Object.keys(PAID_SUPPORTS_DATA).map(Number).sort((a, b) => b - a);
+            years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
+            yearSelect.addEventListener('change', (e) => {
+                state.currentYear = parseInt(e.target.value);
+                state.sankeyFocusNode = null;
+                updateView();
+            });
+
+            // Theme
+            initTheme();
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+            // Sidebar
+            initSidebar();
+            document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
+
+            // Sankey min value control
+            document.getElementById('sankeyMinValue').addEventListener('change', () => {
+                const yearData = PAID_SUPPORTS_DATA[state.currentYear];
+                if (yearData) drawConvergentSankey(yearData);
+            });
+
+            updateView();
+        }
+
+        function updateView() {
+            const yearData = PAID_SUPPORTS_DATA[state.currentYear];
+            if (!yearData) return;
+
+            updateStats(yearData);
+            drawConvergentSankey(yearData);
+        }
+
+        function updateStats(yearData) {
+            const flowData = yearData.convergentFlowData;
+            if (!flowData || !flowData.nodes) return;
+
+            let totalBudget = 0;
+            let totalPaid = 0;
+            let takanaCount = 0;
+            let recipientNodeCount = 0;
+
+            flowData.nodes.forEach(n => {
+                if (n.level === 4) {
+                    totalBudget += n.budget || 0;
+                    totalPaid += n.paid || 0;
+                    takanaCount++;
+                }
+                if (n.level === 5) recipientNodeCount++;
+            });
+
+            const utilization = totalBudget > 0 ? (totalPaid / totalBudget * 100) : 0;
+
+            document.getElementById('totalBudget').textContent = formatBillions(totalBudget) + 'B ₪';
+            document.getElementById('totalPaid').textContent = formatBillions(totalPaid) + 'B ₪';
+            document.getElementById('utilizationRate').textContent = utilization.toFixed(1) + '%';
+            document.getElementById('takanaCount').textContent = takanaCount.toLocaleString('he-IL');
+            document.getElementById('recipientCount').textContent = recipientNodeCount.toLocaleString('he-IL');
+        }
+
+        // ============================================
+        // CONVERGENT SANKEY (D3.js + d3-sankey)
+        // ============================================
+
+        const LEVEL_COLORS = {
+            1: '#58a6ff',  // Rama 1 - Blue
+            2: '#79c0ff',  // Rama 2 - Light blue
+            3: '#56d4dd',  // Seif - Cyan
+            4: '#d29922',  // Takana - Orange
+            5: '#db61a2'   // Recipients - Pink
+        };
+
+        const LINK_COLORS = {
+            left:  { r: 88, g: 166, b: 255 },   // Blue (budget hierarchy)
+            right: { r: 63, g: 185, b: 80 }      // Green (takana → recipients)
+        };
+
+        const COLUMN_LABELS = [
+            { level: 1, text: 'תחום', color: '#58a6ff' },
+            { level: 2, text: 'תת-תחום', color: '#79c0ff' },
+            { level: 3, text: 'סעיף', color: '#56d4dd' },
+            { level: 4, text: 'תקנה', color: '#d29922' },
+            { level: 5, text: 'מקבלי תמיכות', color: '#db61a2' }
+        ];
+
+        // X positions: budget hierarchy on LEFT, recipients on RIGHT
+        // תחום (left) → תת-תחום → סעיף → תקנה → מקבלי תמיכות (right)
+        const X_COLS = { 1: 0.03, 2: 0.18, 3: 0.36, 4: 0.56, 5: 0.88 };
+
+        function getNodeColor(node) {
+            if (node.level === 4) {
+                const util = node.budget > 0 ? (node.paid / node.budget * 100) : 0;
+                if (util > 100) return '#f85149';
+                if (util > 90) return '#e3b341';
+                return '#d29922';
+            }
+            return LEVEL_COLORS[node.level] || '#8b949e';
+        }
+
+        function getLinkColor(side, opacity) {
+            const c = LINK_COLORS[side] || LINK_COLORS.left;
+            return `rgba(${c.r}, ${c.g}, ${c.b}, ${opacity})`;
+        }
+
+        function drawConvergentSankey(yearData) {
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+            const textColor = isDark ? '#e6edf3' : '#1f2328';
+
+            const container = document.getElementById('sankeyFlowChart');
+            const flowData = yearData.convergentFlowData;
+
+            if (!flowData || !flowData.nodes || flowData.nodes.length === 0) {
+                container.innerHTML = '<p style="text-align:center;padding:50px;color:var(--text-secondary);">אין נתוני זרימה מתכנסת זמינים לשנה זו</p>';
+                return;
+            }
+
+            const minValue = parseInt(document.getElementById('sankeyMinValue').value);
+
+            // Build focus lookup
+            const { childrenOf, parentOf } = buildFocusLookup(flowData);
+
+            // Determine visible nodes based on focus
+            let focusAllowedIds = null;
+            if (state.sankeyFocusNode) {
+                const focusNode = flowData.nodes.find(n => n.id === state.sankeyFocusNode);
+                if (focusNode) {
+                    focusAllowedIds = new Set();
+                    focusAllowedIds.add(state.sankeyFocusNode);
+                    getAncestors(state.sankeyFocusNode, parentOf).forEach(id => focusAllowedIds.add(id));
+                    getDescendants(state.sankeyFocusNode, childrenOf).forEach(id => focusAllowedIds.add(id));
+                }
+            }
+
+            updateSankeyBreadcrumb(flowData);
+
+            // Filter nodes — bottom-up: no gap nodes
+            const filteredNodes = flowData.nodes.filter(n => {
+                if (n.side === 'gap' || n.level === 0) return false;
+                if (focusAllowedIds && !focusAllowedIds.has(n.id)) return false;
+                if (n.level === 5) return n.paid >= (minValue / 20);
+                return n.paid >= minValue;
+            });
+            const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
+
+            // Filter links
+            const filteredLinks = flowData.links.filter(l => {
+                if (!filteredNodeIds.has(l.source) || !filteredNodeIds.has(l.target)) return false;
+                return l.value >= (minValue / 20);
+            });
+
+            if (filteredNodes.length <= 1 || filteredLinks.length === 0) {
+                container.innerHTML = '<p style="text-align:center;padding:50px;color:var(--text-secondary);">אין מספיק נתונים להצגה. נסה להוריד את ערך המינימום.</p>';
+                return;
+            }
+
+            // Prepare deep copies for d3-sankey (it mutates data)
+            const sankeyNodes = filteredNodes.map(n => ({
+                ...n,
+                id: n.id,
+                _color: getNodeColor(n),
+                _side: n.side || 'left'
+            }));
+
+            const sankeyLinks = filteredLinks.map(l => ({
+                source: l.source,
+                target: l.target,
+                value: l.value,
+                _side: l.side || 'left',
+                _budget: l.budget || 0,
+                _paid: l.paid || 0
+            }));
+
+            // Count max nodes per column to determine needed height
+            const nodesPerLevel = {};
+            sankeyNodes.forEach(n => {
+                nodesPerLevel[n.level] = (nodesPerLevel[n.level] || 0) + 1;
+            });
+            const maxNodesInColumn = Math.max(...Object.values(nodesPerLevel), 1);
+
+            // Dynamic height: ensure each node gets at least minNodeH + padding
+            const minNodeH = 4;
+            const nodePad = Math.max(2, Math.min(12, Math.floor(600 / maxNodesInColumn)));
+            const neededHeight = maxNodesInColumn * (minNodeH + nodePad) + 100;
+            const baseHeight = 800;
+
+            // SVG dimensions
+            const margin = { top: 40, right: 30, bottom: 20, left: 30 };
+            const fullWidth = container.clientWidth || 1200;
+            const fullHeight = Math.max(baseHeight, Math.min(neededHeight, 4000));
+            const width = fullWidth - margin.left - margin.right;
+            const height = fullHeight - margin.top - margin.bottom;
+
+            // Update container height
+            container.style.height = fullHeight + 'px';
+
+            // Clear container and create SVG
+            container.innerHTML = '';
+            const svg = d3.select(container)
+                .append('svg')
+                .attr('class', 'sankey-svg')
+                .attr('width', fullWidth)
+                .attr('height', fullHeight);
+
+            const g = svg.append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // D3 Sankey layout with dynamic padding
+            const sankeyLayout = d3.sankey()
+                .nodeId(d => d.id)
+                .nodeWidth(20)
+                .nodePadding(nodePad)
+                .nodeAlign(d3.sankeyJustify)
+                .extent([[0, 0], [width, height]]);
+
+            let graph;
+            try {
+                graph = sankeyLayout({
+                    nodes: sankeyNodes,
+                    links: sankeyLinks
+                });
+            } catch (e) {
+                container.innerHTML = '<p style="text-align:center;padding:50px;color:var(--text-secondary);">שגיאה בבניית הגרף. נסה להוריד את ערך המינימום.</p>';
+                console.error('Sankey layout error:', e);
+                return;
+            }
+
+            // Override x positions: budget hierarchy LEFT, recipients RIGHT
+            const nodeWidth = 20;
+            graph.nodes.forEach(node => {
+                const xNorm = X_COLS[node.level] !== undefined ? X_COLS[node.level] : 0.5;
+                const newX0 = xNorm * (width - nodeWidth);
+                const newX1 = newX0 + nodeWidth;
+                node.x0 = newX0;
+                node.x1 = newX1;
+            });
+
+            // Enforce minimum node height after layout
+            graph.nodes.forEach(node => {
+                const h = node.y1 - node.y0;
+                if (h < minNodeH) {
+                    const center = (node.y0 + node.y1) / 2;
+                    node.y0 = center - minNodeH / 2;
+                    node.y1 = center + minNodeH / 2;
+                }
+            });
+
+            const linkPathGen = d3.sankeyLinkHorizontal();
+
+            // --- Draw links ---
+            const linksGroup = g.append('g').attr('class', 'sankey-links');
+
+            const linkSelection = linksGroup.selectAll('.sankey-link')
+                .data(graph.links)
+                .join('path')
+                .attr('class', 'sankey-link')
+                .attr('d', linkPathGen)
+                .attr('stroke', d => getLinkColor(d._side, 0.40))
+                .attr('stroke-width', d => Math.max(1, d.width))
+                .style('stroke-opacity', 0.40);
+
+            // --- Draw nodes ---
+            const nodesGroup = g.append('g').attr('class', 'sankey-nodes');
+
+            const nodeSelection = nodesGroup.selectAll('.sankey-node')
+                .data(graph.nodes)
+                .join('g')
+                .attr('class', 'sankey-node')
+                .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+            nodeSelection.append('rect')
+                .attr('width', d => d.x1 - d.x0)
+                .attr('height', d => Math.max(minNodeH, d.y1 - d.y0))
+                .attr('fill', d => d._color)
+                .attr('rx', 3)
+                .attr('ry', 3);
+
+            // Only show labels if node is tall enough to be readable
+            nodeSelection
+                .filter(d => (d.y1 - d.y0) >= 10 || d.level <= 2)
+                .append('text')
+                .attr('x', d => {
+                    // Level 1 (leftmost): label to the left
+                    if (d.level === 1) return -6;
+                    // Everything else: label to the right
+                    return (d.x1 - d.x0) + 6;
+                })
+                .attr('y', d => Math.max(minNodeH, d.y1 - d.y0) / 2)
+                .attr('dy', '0.35em')
+                .attr('text-anchor', d => {
+                    if (d.level === 1) return 'end';
+                    return 'start';
+                })
+                .attr('fill', textColor)
+                .attr('font-size', d => {
+                    if (d.level >= 4) return '9px';
+                    return '11px';
+                })
+                .text(d => {
+                    const maxLen = d.level >= 4 ? 25 : 30;
+                    let label = d.name;
+                    if (d.side !== 'gap' && d.level !== 4) {
+                        label += ' (' + (d.paid / 1e3).toFixed(1) + 'M)';
+                    }
+                    return label.length > maxLen ? label.slice(0, maxLen) + '…' : label;
+                });
+
+            // --- Column header labels ---
+            const labelsGroup = svg.append('g')
+                .attr('transform', `translate(${margin.left}, 20)`);
+
+            COLUMN_LABELS.forEach(col => {
+                const xNorm = X_COLS[col.level];
+                const xPos = xNorm * (width - nodeWidth) + nodeWidth / 2;
+                labelsGroup.append('text')
+                    .attr('class', 'sankey-column-label')
+                    .attr('x', xPos)
+                    .attr('y', 0)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', col.color)
+                    .text(col.text);
+            });
+
+            // --- Tooltip ---
+            const tooltip = document.getElementById('sankeyTooltip');
+
+            function showTooltip(event, d) {
+                const budget = d.budget || 0;
+                const paid = d.paid || 0;
+                const util = budget > 0 ? (paid / budget * 100) : 0;
+
+                let html = `<b>${d.name}</b>`;
+                html += `<div class="tt-divider"></div>`;
+                if (d.level === 5) {
+                    // Recipient node — just show amount received
+                    html += `<span class="tt-label">סכום ששולם: </span><span class="tt-value" style="color:var(--accent-green)">${formatNumber(paid)} אלפי ₪</span>`;
+                } else {
+                    html += `<span class="tt-label">תקציב מוקצה: </span><span class="tt-value">${formatNumber(budget)} אלפי ₪</span><br>`;
+                    html += `<span class="tt-label">שולם כתמיכה: </span><span class="tt-value" style="color:var(--accent-green)">${formatNumber(paid)} אלפי ₪</span>`;
+                    if (budget > 0) {
+                        const utilColor = util > 100 ? 'var(--accent-red)' : util > 90 ? 'var(--accent-orange)' : 'var(--accent-blue)';
+                        html += `<br><span class="tt-label">ניצול: </span><span class="tt-value" style="color:${utilColor}">${util.toFixed(1)}%</span>`;
+                    }
+                }
+
+                tooltip.innerHTML = html;
+                tooltip.classList.add('visible');
+                positionTooltip(event);
+            }
+
+            function showLinkTooltip(event, d) {
+                const sourceName = d.source.name || '';
+                const targetName = d.target.name || '';
+                let html = `<b>${sourceName}</b> → <b>${targetName}</b>`;
+                html += `<div class="tt-divider"></div>`;
+                html += `<span class="tt-label">סכום: </span><span class="tt-value">${formatNumber(d.value)} אלפי ₪</span>`;
+                tooltip.innerHTML = html;
+                tooltip.classList.add('visible');
+                positionTooltip(event);
+            }
+
+            function positionTooltip(event) {
+                const tt = tooltip;
+                const x = event.clientX;
+                const y = event.clientY;
+                const pad = 15;
+
+                // Position to avoid going off-screen
+                let left = x + pad;
+                let top = y - pad;
+                if (left + 320 > window.innerWidth) left = x - 320 - pad;
+                if (top + 200 > window.innerHeight) top = y - 200;
+                if (top < 0) top = 10;
+
+                tt.style.left = left + 'px';
+                tt.style.top = top + 'px';
+            }
+
+            function hideTooltip() {
+                tooltip.classList.remove('visible');
+            }
+
+            // --- Hover highlight (inspired by kolot-nodedim) ---
+            function highlightNode(node) {
+                const connectedLinks = new Set();
+                const connectedNodes = new Set([node.id]);
+
+                linkSelection.each(function(d) {
+                    if (d.source.id === node.id || d.target.id === node.id) {
+                        connectedLinks.add(this);
+                        connectedNodes.add(d.source.id);
+                        connectedNodes.add(d.target.id);
+                    }
+                });
+
+                linkSelection
+                    .style('stroke-opacity', function() {
+                        return connectedLinks.has(this) ? 0.70 : 0.06;
+                    })
+                    .attr('stroke', function(d) {
+                        return connectedLinks.has(this)
+                            ? getLinkColor(d._side, 0.70)
+                            : getLinkColor(d._side, 0.06);
+                    });
+
+                nodeSelection.style('opacity', d => connectedNodes.has(d.id) ? 1 : 0.25);
+            }
+
+            function unhighlightAll() {
+                linkSelection
+                    .style('stroke-opacity', 0.40)
+                    .attr('stroke', d => getLinkColor(d._side, 0.40));
+                nodeSelection.style('opacity', 1);
+            }
+
+            // --- Node interactions ---
+            nodeSelection
+                .on('mouseenter', function(event, d) {
+                    highlightNode(d);
+                    showTooltip(event, d);
+                })
+                .on('mousemove', function(event) {
+                    positionTooltip(event);
+                })
+                .on('mouseleave', function() {
+                    unhighlightAll();
+                    hideTooltip();
+                })
+                .on('click', function(event, d) {
+                    if (state.sankeyFocusNode === d.id) {
+                        state.sankeyFocusNode = null;
+                    } else {
+                        state.sankeyFocusNode = d.id;
+                    }
+                    drawConvergentSankey(yearData);
+                });
+
+            // --- Link interactions ---
+            linkSelection
+                .on('mouseenter', function(event, d) {
+                    d3.select(this).style('stroke-opacity', 0.65);
+                    showLinkTooltip(event, d);
+                })
+                .on('mousemove', function(event) {
+                    positionTooltip(event);
+                })
+                .on('mouseleave', function(event, d) {
+                    d3.select(this).style('stroke-opacity', 0.40);
+                    hideTooltip();
+                });
+        }
+
+        function formatNumber(val) {
+            return Math.round(val).toLocaleString('he-IL');
+        }
+
+        // ============================================
+        // SANKEY FOCUS HELPERS
+        // ============================================
+
+        function buildFocusLookup(flowData) {
+            const childrenOf = {};
+            const parentOf = {};
+            flowData.links.forEach(l => {
+                if (!childrenOf[l.source]) childrenOf[l.source] = new Set();
+                childrenOf[l.source].add(l.target);
+                parentOf[l.target] = l.source;
+            });
+            return { childrenOf, parentOf };
+        }
+
+        function getDescendants(nodeId, childrenOf) {
+            const result = new Set();
+            const queue = [nodeId];
+            while (queue.length > 0) {
+                const current = queue.shift();
+                const children = childrenOf[current];
+                if (children) {
+                    children.forEach(c => {
+                        if (!result.has(c)) {
+                            result.add(c);
+                            queue.push(c);
+                        }
+                    });
+                }
+            }
+            return result;
+        }
+
+        function getAncestors(nodeId, parentOf) {
+            const result = new Set();
+            let current = nodeId;
+            while (parentOf[current]) {
+                result.add(parentOf[current]);
+                current = parentOf[current];
+            }
+            return result;
+        }
+
+        function updateSankeyBreadcrumb(flowData) {
+            const bc = document.getElementById('sankeyBreadcrumb');
+            if (!state.sankeyFocusNode) {
+                bc.innerHTML = '';
+                return;
+            }
+
+            const { parentOf } = buildFocusLookup(flowData);
+            const nodeMap = {};
+            flowData.nodes.forEach(n => nodeMap[n.id] = n);
+
+            const path = [];
+            let current = state.sankeyFocusNode;
+            while (current) {
+                path.unshift(current);
+                current = parentOf[current];
+            }
+
+            bc.innerHTML = `
+                <button class="sankey-breadcrumb-btn" onclick="clearSankeyFocus()">&#8592; הצג הכל</button>
+                <span class="sankey-focus-label">מיקוד:
+                    ${path.map(id => {
+                        const n = nodeMap[id];
+                        return n ? n.name : id;
+                    }).join(' → ')}
+                </span>
+            `;
+        }
+
+        function clearSankeyFocus() {
+            state.sankeyFocusNode = null;
+            const yearData = PAID_SUPPORTS_DATA[state.currentYear];
+            if (yearData) drawConvergentSankey(yearData);
+        }
+
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+
+        function formatBillions(value) {
+            return (value / 1e6).toFixed(1);
+        }
+
+        function formatMillions(value) {
+            return (value / 1e3).toFixed(1);
+        }
+
+        // Theme
+        function initTheme() {
+            const savedTheme = localStorage.getItem('budget-theme') || 'dark';
+            applyTheme(savedTheme);
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = current === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('budget-theme', newTheme);
+            applyTheme(newTheme);
+            updateView();
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('themeToggle').innerHTML = theme === 'dark' ? '&#9790;' : '&#9788;';
+        }
+
+        // Sidebar
+        function initSidebar() {
+            const savedState = localStorage.getItem('sidebar-expanded');
+            if (savedState === 'true') {
+                document.getElementById('sidebar').classList.add('expanded');
+                document.body.classList.add('sidebar-expanded');
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('expanded');
+            document.body.classList.toggle('sidebar-expanded');
+            localStorage.setItem('sidebar-expanded', sidebar.classList.contains('expanded'));
+        }
+
+        // Start
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
